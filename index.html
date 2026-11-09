@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#2f5d3a">
+<title>Liburan Safari</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="layar"></canvas>
+
+<div id="hud" class="sembunyi">
+  <div id="zona">📍 <span>Parkir</span></div>
+  <div id="kanan-atas">
+    <canvas id="minimap" width="240" height="240" aria-label="Peta kecil, ketuk untuk peta besar"></canvas>
+    <div class="tombol-kolom">
+      <button id="btn-mode" class="tbl" title="Ganti sudut pandang (V)">👁 <b>TPP</b></button>
+      <button id="btn-foto" class="tbl" title="Ambil foto">📷</button>
+      <button id="btn-suara" class="tbl" title="Suara">🔊</button>
+    </div>
+  </div>
+  <div id="joy"><div id="joy-dasar"></div><div id="joy-tuas"></div></div>
+  <div id="kanan-bawah">
+    <button id="btn-aksi" class="sembunyi">Lihat</button>
+    <button id="btn-pasangan" title="Ngobrol dengan pasangan">💬</button>
+  </div>
+  <div id="gelembung" class="sembunyi"></div>
+  <div id="petunjuk" class="sembunyi"></div>
+</div>
+
+<div id="mulai" class="layar-penuh">
+  <div class="kartu-mulai">
+    <div class="logo">🦒🌿🦓</div>
+    <h1 id="judul">Liburan Safari</h1>
+    <p id="subjudul" class="kecil">Jalan-jalan berdua, bergandengan tangan</p>
+    <p class="label">Pilih sudut pandang</p>
+    <div class="pilih-mode">
+      <button class="mode" data-mode="fpp">
+        <span class="ikon">👀</span><b>FPP</b><small>Lihat dari mata kamu sendiri. Pasangan menuntunmu di depan.</small>
+      </button>
+      <button class="mode" data-mode="tpp">
+        <span class="ikon">🧍‍♀️🧍‍♂️</span><b>TPP</b><small>Kamera di belakang, kalian berdua terlihat bergandengan.</small>
+      </button>
+    </div>
+    <p class="kecil">Bisa diganti kapan saja lewat tombol 👁 di pojok kanan atas.</p>
+    <button id="btn-mulai" class="utama">Mulai Jalan</button>
+    <p id="memuat" class="kecil">Menyiapkan taman…</p>
+  </div>
+</div>
+
+<div id="kartu" class="layar-penuh sembunyi">
+  <div class="kartu-info">
+    <div class="emoji" id="k-emoji">🦓</div>
+    <h2 id="k-judul">Zebra</h2>
+    <div id="k-isi"></div>
+    <div class="baris-tombol">
+      <button id="k-aksi" class="utama sembunyi">Beri wortel 🥕</button>
+      <button id="k-tutup">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<div id="peta" class="layar-penuh sembunyi">
+  <div class="kartu-peta">
+    <div class="judul-peta"><b>Peta Taman</b><button id="peta-tutup">✕</button></div>
+    <canvas id="peta-kanvas"></canvas>
+    <p class="kecil">Titik merah muda adalah kalian berdua. Utara di atas.</p>
+  </div>
+</div>
+
+<div id="hasil-foto" class="layar-penuh sembunyi">
+  <div class="kartu-info">
+    <img id="foto-img" alt="Foto liburan">
+    <div class="baris-tombol">
+      <a id="foto-unduh" class="utama" download="liburan-safari.png">Simpan foto</a>
+      <button id="foto-tutup">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<div id="galat" class="layar-penuh sembunyi"><div class="kartu-info"><h2>Maaf</h2><p>Perangkat ini belum bisa menampilkan 3D (WebGL). Coba buka di Chrome atau Safari terbaru.</p></div></div>
+
+<script src="data.js"></script>
+<script type="module" src="js/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+// Isi game yang mudah diubah. Simpan file ini, lalu muat ulang halaman.
+window.SAFARI = {
+  judul: 'Liburan Safari',
+  subjudul: 'Jalan-jalan berdua, bergandengan tangan',
+  namaGerbang: 'PETUALANGAN SAFARI',
+  namaPasangan: 'Dia',
+
+  // Warna baju (boleh diganti kode warna lain)
+  bajuKamu: '#e8836f',
+  bajuPasangan: '#4f7d6b',
+  celanaPasangan: '#c9b28a',
+
+  // Kalimat pasangan saat diketuk
+  kataPasangan: [
+    'Senang banget bisa liburan berdua sama kamu.',
+    'Tanganmu jangan dilepas ya, nanti hilang di antara jerapah.',
+    'Capek? Nanti kita istirahat di dekat air terjun.',
+    'Foto dulu yuk, mumpung pemandangannya bagus.',
+    'Kamu mau lihat hewan apa lagi?',
+    'Hari ini rasanya pengin lama-lama aja.'
+  ],
+
+  // Komentar pasangan saat pertama kali masuk sebuah area
+  komentarZona: {
+    parkir: 'Sudah sampai! Yuk masuk lewat gerbang.',
+    flamingo: 'Lihat, flamingonya pink semua!',
+    gajah: 'Gajahnya besar banget, lihat belalainya.',
+    singa: 'Hati-hati, itu raja hutan. Jangan dekat-dekat pagar.',
+    unta: 'Untanya santai banget jalannya.',
+    bison: 'Bison itu kuat, lihat punuknya.',
+    jerapah: 'Lehernya tinggi sekali. Coba kasih wortel!',
+    zebra: 'Belangnya rapi ya, kayak garis-garis bajumu.',
+    babyzoo: 'Ada kelinci dan kambing kecil. Lucu!',
+    rekreasi: 'Naik bianglala nanti sore yuk.',
+    harimau: 'Harimaunya lagi jalan-jalan juga, kayak kita.',
+    beruang: 'Itu beruang madu, ada tanda oranye di dadanya.',
+    kemah: 'Kapan-kapan kita kemah di sini ya.',
+    panda: 'Pandanya lagi makan bambu. Gemas!',
+    airterjun: 'Dengar suara airnya? Adem banget di sini.'
+  }
+};
