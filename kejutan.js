@@ -21,5 +21,16 @@ window.KEJUTAN = {
     "ucapan": "Semoga semua harapanmu terkabul. Terima kasih sudah jadi orang paling spesial 💖",
     "kataPasangan": "Selamat ulang tahun, sayang. Semoga semua harapanmu terkabul. 💖",
     "lagu": ""
+  },
+  "lamaran": {
+    "aktif": true,
+    "ajak": "Sayang, berdiri sebentar yuk. Ada yang mau aku omongin.",
+    "kata": "Sayang, terima kasih untuk semua waktu yang sudah kita lewati bersama. Maukah kamu menikah denganku?",
+    "suara": "",
+    "tidak": "Terima kasih sudah meluangkan waktumu malam ini. Yuk kita jalan-jalan lagi, sayang.",
+    "terima": "Terima kasih sudah menerimaku 💍",
+    "suaraTerima": "",
+    "loveTeks": "I LOVE YOU",
+    "loveBawah": "FOREVER"
   }
 };

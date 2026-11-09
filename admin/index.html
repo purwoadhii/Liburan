@@ -92,6 +92,20 @@ progress{width:100%;height:10px}
       <label>Backsound <small>(MP3/M4A, maksimal sekitar 15 MB)</small></label>
       <input id="kj-lagu" type="file" accept="audio/*">
       <div id="kj-lagu-ada" class="kecil" style="margin-top:6px"></div>
+      <h3>💍 Lamaran di air terjun <small>(jam 00.00, saat kembang api)</small></h3>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input id="kj-lamar-aktif" type="checkbox" style="width:auto"> Aktifkan lamaran</label>
+      <label>Ajakan berdiri dari bangku</label><input id="kj-lamar-ajak" maxlength="120" placeholder="Sayang, berdiri sebentar yuk. Ada yang mau aku omongin.">
+      <label>Kalimat lamaran <small>(tampil di gelembung dan kartu Iya/Tidak)</small></label><textarea id="kj-lamar-kata" maxlength="400"></textarea>
+      <label>Suara lamaran <small>(MP3/M4A, diputar saat berlutut; pilihan Iya/Tidak muncul setelah suara selesai)</small></label>
+      <input id="kj-lamar-suara" type="file" accept="audio/*">
+      <div id="kj-lamar-suara-ada" class="kecil" style="margin-top:6px"></div>
+      <label>Jawaban pasangan jika "Tidak"</label><textarea id="kj-lamar-tidak" maxlength="300"></textarea>
+      <label>Ucapan setelah berpelukan</label><input id="kj-lamar-terima" maxlength="120" placeholder="Terima kasih sudah menerimaku 💍">
+      <label>Suara "terima kasih sudah menerimaku"</label>
+      <input id="kj-lamar-suara2" type="file" accept="audio/*">
+      <div id="kj-lamar-suara2-ada" class="kecil" style="margin-top:6px"></div>
+      <label>Tulisan kunang-kunang di bawah hati</label><input id="kj-lamar-love" maxlength="20" placeholder="I LOVE YOU">
+      <label>Tulisan yang muncul perlahan di bawahnya</label><input id="kj-lamar-bawah" maxlength="16" placeholder="FOREVER">
       <progress id="kj-progres" class="sembunyi"></progress>
       <div class="baris"><button class="utama" id="kj-simpan">Simpan kejutan</button></div>
     </div>
@@ -256,11 +270,11 @@ $('simpan-pengaturan').onclick = async () => {
 
 // ---------- kejutan ----------
 let kj = {};
-const KJ_AWAL = { kelinci: { judul: '', isi: '' }, gajah: { judul: '', isi: '' }, jerapah: '', kunang: '', kenangan: { pesan: '', foto: [], video: '' }, ultah: { aktif: true, nama: '', ucapan: '', kataPasangan: '', lagu: '' } };
+const KJ_AWAL = { kelinci: { judul: '', isi: '' }, gajah: { judul: '', isi: '' }, jerapah: '', kunang: '', kenangan: { pesan: '', foto: [], video: '' }, ultah: { aktif: true, nama: '', ucapan: '', kataPasangan: '', lagu: '' }, lamaran: { aktif: true, ajak: '', kata: '', suara: '', tidak: '', terima: '', suaraTerima: '', loveTeks: '', loveBawah: '' } };
 async function muatKejutan() {
   const f = await gh('kejutan.js');
   kj = JSON.parse(JSON.stringify(KJ_AWAL));
-  if (f) { const m = utf8b64(f.content).match(/window\.KEJUTAN\s*=\s*([\s\S]*?);\s*$/); try { const d = JSON.parse(m[1]); kj = { ...kj, ...d, kelinci: { ...kj.kelinci, ...(d.kelinci || {}) }, gajah: { ...kj.gajah, ...(d.gajah || {}) }, kenangan: { ...kj.kenangan, ...(d.kenangan || {}) }, ultah: { ...kj.ultah, ...(d.ultah || {}) } }; } catch (e) {} }
+  if (f) { const m = utf8b64(f.content).match(/window\.KEJUTAN\s*=\s*([\s\S]*?);\s*$/); try { const d = JSON.parse(m[1]); kj = { ...kj, ...d, kelinci: { ...kj.kelinci, ...(d.kelinci || {}) }, gajah: { ...kj.gajah, ...(d.gajah || {}) }, kenangan: { ...kj.kenangan, ...(d.kenangan || {}) }, ultah: { ...kj.ultah, ...(d.ultah || {}) }, lamaran: { ...kj.lamaran, ...(d.lamaran || {}) } }; } catch (e) {} }
   tampilKejutan();
 }
 function tampilKejutan() {
@@ -270,7 +284,14 @@ function tampilKejutan() {
   $('kj-pesan').value = kj.kenangan.pesan || '';
   $('kj-ultah-aktif').checked = kj.ultah.aktif !== false; $('kj-ultah-nama').value = kj.ultah.nama || '';
   $('kj-ultah-ucapan').value = kj.ultah.ucapan || ''; $('kj-ultah-kata').value = kj.ultah.kataPasangan || '';
-  for (const id of ['kj-foto', 'kj-video', 'kj-lagu']) $(id).value = '';
+  const L = kj.lamaran;
+  $('kj-lamar-aktif').checked = L.aktif !== false; $('kj-lamar-ajak').value = L.ajak || ''; $('kj-lamar-kata').value = L.kata || ''; $('kj-lamar-tidak').value = L.tidak || '';
+  $('kj-lamar-terima').value = L.terima || ''; $('kj-lamar-love').value = L.loveTeks || ''; $('kj-lamar-bawah').value = L.loveBawah || '';
+  for (const [k, id] of [['suara', 'kj-lamar-suara-ada'], ['suaraTerima', 'kj-lamar-suara2-ada']]) {
+    $(id).innerHTML = L[k] ? `<audio controls src="../${esc(L[k])}" style="width:100%;margin-top:4px"></audio><button class="hapus" data-k="${k}" style="padding:4px 12px;margin-top:6px">Hapus suara</button>` : 'Belum ada suara. Tanpa suara, kalimatnya tetap tampil sebagai tulisan.';
+    const b = $(id).querySelector('button'); if (b) b.onclick = () => { KJ_HAPUS.push(L[k]); L[k] = ''; tampilKejutan(); status('Suara dihapus. Tekan Simpan kejutan untuk menyimpan.', 4000); };
+  }
+  for (const id of ['kj-foto', 'kj-video', 'kj-lagu', 'kj-lamar-suara', 'kj-lamar-suara2']) $(id).value = '';
   const foto = kj.kenangan.foto || [];
   $('kj-foto-ada').innerHTML = foto.length ? `${foto.length} foto tersimpan: ` + foto.map(p => `<img src="../${esc(p)}?t=${Date.now()}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;vertical-align:middle;margin:2px">`).join('') + ' <button id="kj-foto-hapus" class="hapus" style="padding:4px 12px">Hapus semua foto</button>' : 'Belum ada foto.';
   $('kj-video-ada').innerHTML = kj.kenangan.video ? `Video tersimpan. <button id="kj-video-hapus" class="hapus" style="padding:4px 12px">Hapus video</button>` : 'Belum ada video.';
@@ -316,6 +337,14 @@ $('kj-simpan').onclick = async () => {
       status('Mengunggah backsound…', 0);
       const p = `kejutan/lagu-${id}.${(lf.name.split('.').pop() || 'mp3').toLowerCase()}`; await tulis(p, await fileB64(lf), 'Backsound ulang tahun');
       if (kj.ultah.lagu) KJ_HAPUS.push(kj.ultah.lagu); kj.ultah.lagu = p;
+    }
+    kj.lamaran = { ...kj.lamaran, aktif: $('kj-lamar-aktif').checked, ajak: $('kj-lamar-ajak').value.trim(), kata: $('kj-lamar-kata').value.trim(), tidak: $('kj-lamar-tidak').value.trim(), terima: $('kj-lamar-terima').value.trim(), loveTeks: $('kj-lamar-love').value.trim(), loveBawah: $('kj-lamar-bawah').value.trim() };
+    for (const [id, k, nama] of [['kj-lamar-suara', 'suara', 'lamaran'], ['kj-lamar-suara2', 'suaraTerima', 'terima']]) {
+      const sf = $(id).files[0]; if (!sf) continue;
+      if (sf.size > 15 * 1024 * 1024) throw new Error('Suara lebih dari 15 MB.');
+      status('Mengunggah suara ' + nama + '…', 0);
+      const p = `kejutan/suara-${nama}-${id.length}${Date.now().toString(36)}.${(sf.name.split('.').pop() || 'mp3').toLowerCase()}`; await tulis(p, await fileB64(sf), 'Suara ' + nama);
+      if (kj.lamaran[k]) KJ_HAPUS.push(kj.lamaran[k]); kj.lamaran[k] = p;
     }
     status('Menyimpan kejutan…', 0);
     const teks = '// Isi kejutan di taman safari. Diatur lewat halaman admin (/admin/).\nwindow.KEJUTAN = ' + JSON.stringify(kj, null, 2) + ';\n';
