@@ -78,7 +78,7 @@ window.SAFARI = {
 
   // Komentar pasangan saat pertama kali masuk sebuah area
   komentarZona: {
-    parkir: 'Sudah sampai! Yuk masuk lewat gerbang.',
+    parkir: 'Sudah sampai! Beli tiket dulu di loket, terus kita masuk lewat gerbang.',
     flamingo: 'Lihat, flamingonya pink semua!',
     gajah: 'Gajahnya besar banget, lihat belalainya.',
     singa: 'Hati-hati, itu raja hutan. Jangan dekat-dekat pagar.',
