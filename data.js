@@ -16,7 +16,7 @@ window.SAFARI = {
 
   // Harga (rupiah)
   hargaMakananMin: 15000,      // harga paling murah per porsi di food court
-  tiketMasuk: 15000,           // per orang, dibayar sekali per hari di gerbang
+  tiketMasuk: 15000,           // per orang, berlaku sampai keluar taman atau refresh
   tiketBioskop: 20000,         // per orang
   hargaPopcorn: 25000,
   hargaMinumBioskop: 15000,

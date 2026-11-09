@@ -2246,7 +2246,7 @@ function openInter(it) {
   else if (it.kind === 'hidangan') { lihatHidangan(it.data); return; }
   else if (it.kind === 'pakan') { bukaBooth(it.data); return; }
   else if (it.kind === 'halte') { bukaJadwal(it.data); return; }
-  else if (it.kind === 'loketMasuk') { if (antriPemain) { hint('Kalian sedang antre.'); return; } if (sudahTiket()) { hint('Tiket hari ini sudah dibeli. Langsung masuk lewat gerbang.', 3000); return; } tawarAntri(LOKET_MASUK[it.data], bukaTiketMasuk, '🎟️ Loket Masuk'); return; }
+  else if (it.kind === 'loketMasuk') { if (antriPemain) { hint('Kalian sedang antre.'); return; } if (sudahTiket()) { hint('Tiket sudah dibeli. Langsung masuk lewat gerbang.', 3000); return; } tawarAntri(LOKET_MASUK[it.data], bukaTiketMasuk, '🎟️ Loket Masuk'); return; }
   else { info = LANDMARK[it.data]; }
   if (!info) return;
   paused = true;
@@ -2795,10 +2795,18 @@ function bukaJadwal(h) {
   const baris = JIP.map(J => { const w = tibaBerikut(J, k); if (w == null) return ''; const menit = Math.max(0, Math.round(w / 24 * WAKTU.menitHari)); return `<li>🚙 Safari ${J.no}: ${J.berhenti === k ? '<b>sedang berhenti di sini</b>' : (menit < 1 ? 'kurang dari 1 menit lagi' : '± ' + menit + ' menit lagi') + ` (jam ${jamTeks((WAKTU.jam + w) % 24)})`}</li>`; }).join('');
   kartu('🚙', 'Halte ' + h.nama.replace('Zona ', ''), `<ul>${baris}</ul><div class="catatan">Naik jip ${fmtRp(hargaJip())} per orang. Tunggu di halte, tombol naik muncul saat jip berhenti. Kalian bisa turun di halte mana saja.</div>`);
 }
-// tiket masuk taman, sekali per hari (hari berganti jam 7 pagi waktu taman)
-const TIKET = { hari: (() => { try { const v = localStorage.getItem('safari_tiket'); return v == null ? null : +v; } catch (e) { return null; } })(), tanyaT: -1e9 };
-function sudahTiket() { cekDompet(); return TIKET.hari === DOMPET.hari; }
+// tiket masuk taman: berlaku selama masih di dalam taman dan halaman belum di-refresh.
+// keluar lewat gerbang atau refresh = beli tiket lagi (uang tetap sisa, reset jam 7 pagi)
+try { localStorage.removeItem('safari_tiket'); } catch (e) {}
+const TIKET = { punya: false, tanyaT: -1e9 };
+function sudahTiket() { return TIKET.punya; }
 function cekGerbang(zLama) {
+  if (TIKET.punya && zLama < 90.6 && player.z >= 90.6 && Math.abs(player.x - 30) <= 8) {
+    TIKET.punya = false;
+    hint('Kalian keluar dari taman. Kalau mau masuk lagi, beli tiket lagi di loket ya.', 4000);
+    setTimeout(() => bicara('Kalau masuk lagi bayar tiket lagi lho.', 3), 600);
+    return;
+  }
   if (player.z >= 90.6 || zLama < 90.6 || Math.abs(player.x - 30) > 8 || sudahTiket()) return;
   player.z = 90.6;
   if (paused || performance.now() - TIKET.tanyaT < 4000) return;
@@ -2808,10 +2816,10 @@ function cekGerbang(zLama) {
 }
 function bukaTiketMasuk() {
   const h = D.tiketMasuk != null ? D.tiketMasuk : 15000, tot = h * 2;
-  if (sudahTiket()) { hint('Tiket hari ini sudah dibeli.'); return; }
-  kartu('🎟️', 'Loket Masuk', `<p style="text-align:center">Tiket masuk taman ${fmtRp(h)} per orang.<br>Untuk berdua: <b>${fmtRp(tot)}</b></p><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)} · berlaku sampai jam ${DOMPET.jamReset} pagi besok</div>`, 'Bayar ' + fmtRp(tot), () => {
+  if (sudahTiket()) { hint('Tiket sudah dibeli. Langsung masuk lewat gerbang.'); return; }
+  kartu('🎟️', 'Loket Masuk', `<p style="text-align:center">Tiket masuk taman ${fmtRp(h)} per orang.<br>Untuk berdua: <b>${fmtRp(tot)}</b></p><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)} · berlaku sampai kalian keluar taman</div>`, 'Bayar ' + fmtRp(tot), () => {
     if (!bayar(tot)) { hint('Uangnya nggak cukup untuk tiket masuk.', 3000); return; }
-    TIKET.hari = DOMPET.hari; try { localStorage.setItem('safari_tiket', TIKET.hari); } catch (e) {}
+    TIKET.punya = true;
     hint('Tiket dibayar. Selamat bersenang-senang! 🎉', 3000); setTimeout(() => bicara('Yuk masuk! Jangan lepas tanganku ya.'), 800);
   });
   $('k-tutup').textContent = 'Nanti dulu';
