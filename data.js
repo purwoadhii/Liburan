@@ -20,6 +20,11 @@ window.SAFARI = {
   tiketBioskop: 20000,         // per orang
   hargaPopcorn: 25000,
   hargaMinumBioskop: 15000,
+  // Jip safari (3 mobil): harga per orang, lama 1 putaran dalam menit taman (jarak antar jip = putaran / 3),
+  // lama berhenti di tiap halte dalam menit taman. 1 menit taman = 2,5 detik nyata.
+  hargaJip: 10000,
+  putaranJip: 60,
+  berhentiJip: 4,
   // Pakan di booth sebelah kandang: [nama, harga per porsi]
   pakanHewan: {
     kelinci: [['Wortel', 10000], ['Kangkung', 12000]],
