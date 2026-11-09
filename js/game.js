@@ -922,6 +922,8 @@ const KIOS = [
   { nama: 'Kopi & Teh', emoji: '☕', warna: '#7a5634', menu: [['Es Kopi Susu', 20], ['Kopi Hitam', 12], ['Cappuccino', 25], ['Teh Tarik', 15], ['Es Teh Manis', 8], ['Coklat Panas', 18]] },
   { nama: 'Es Krim & Jus', emoji: '🍦', warna: '#2f7f7a', menu: [['Es Krim 2 Rasa', 18], ['Jus Alpukat', 20], ['Jus Mangga', 18], ['Es Campur', 18], ['Es Kelapa Muda', 15], ['Smoothie Stroberi', 22]] }
 ];
+// harga paling murah per porsi (data.js hargaMakananMin), harga dalam ribuan
+for (const k of KIOS) for (const m of k.menu) m[1] = Math.max(Math.round((D.hargaMakananMin || 15000) / 1000), m[1]);
 const MEJA = [];
 let pesanan = [];
 {
@@ -1580,7 +1582,7 @@ function tampilBerdiri(on) { $('btn-berdiri').classList.toggle('sembunyi', !on);
 function berdiri() {
   if (!duduk) return;
   if (duduk.meja) { const mj = duduk.meja; if (pesanan.some(p => p.meja === mj && p.diantar)) { for (const o of mj.makanan) scene.remove(o); mj.makanan = []; pesanan = pesanan.filter(p => !(p.meja === mj && p.diantar)); } kamu.headParts[0].rotation.x = dia.headParts[0].rotation.x = 0; $('btn-makan').classList.add('sembunyi'); player.x = duduk.meja.x; player.z = duduk.meja.z + 1.9; }
-  if (duduk.bioskop) { selesaiFilm(); player.x = 66.6; player.z = duduk.a[1]; }
+  if (duduk.bioskop) { selesaiFilm(); player.x = 66.6; player.z = duduk.a[1]; if (BAWA.cowok.length || BAWA.cewek.length) { aturBawa(0, 0); setTimeout(() => bicara('Popcorn-nya habis. Gandengan lagi ya.', 3), 600); } }
   partner.x = player.x + 0.7; partner.z = player.z;
   duduk = null; tampilBerdiri(false);
   kamu.group.position.y = 0; dia.group.position.y = 0;
@@ -1599,12 +1601,31 @@ function posisiDuduk() {
 function ytId(u) { const m = String(u || '').match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : null; }
 function bukaFilm() {
   const daftar = (F.daftar || []).filter(f => f.judul).slice(0, 3);
-  if (!daftar.length) { kartu('🎬', 'Bioskop', '<p>Belum ada film yang diputar. Film bisa ditambahkan lewat halaman admin.</p>'); return; }
-  const html = '<div class="menu">' + daftar.map((f, i) => `<label class="menu-item film"><input type="radio" name="film" value="${i}" ${i === 0 ? 'checked' : ''}>${f.poster ? `<img src="${f.poster}" alt="">` : '<span class="poster-kosong">🎬</span>'}<span><b>${f.judul}</b><small>${f.sinopsis || ''}</small></span></label>`).join('') + '</div>';
-  kartu('🎬', 'Pilih Film', html, 'Tonton berdua 🍿', () => {
-    const x = document.querySelector('#k-isi input[name=film]:checked');
-    mulaiFilm(daftar[x ? +x.value : 0]);
+  const hT = D.tiketBioskop != null ? D.tiketBioskop : 20000, hP = D.hargaPopcorn != null ? D.hargaPopcorn : 25000, hM = D.hargaMinumBioskop != null ? D.hargaMinumBioskop : 15000;
+  const film = daftar.length ? '<div class="menu">' + daftar.map((f, i) => `<label class="menu-item film"><input type="radio" name="film" value="${i}" ${i === 0 ? 'checked' : ''}>${f.poster ? `<img src="${f.poster}" alt="">` : '<span class="poster-kosong">🎬</span>'}<span><b>${f.judul}</b><small>${f.sinopsis || ''}</small></span></label>`).join('') + '</div>' : '<p>Belum ada film yang diputar. Film bisa ditambahkan lewat halaman admin.</p>';
+  const baris = (id, nama, h) => `<div class="menu-item" data-id="${id}" data-h="${h}"><span>${nama}<small>${fmtRp(h)}</small></span><button class="qty" data-d="-1">−</button><b class="jml">0</b><button class="qty" data-d="1">+</button></div>`;
+  const html = film + `<div class="catatan">🎟️ Tiket ${fmtRp(hT)} per orang</div>` +
+    '<p class="label">Popcorn & minuman</p><div class="menu">' + baris('pop', '🍿 Popcorn', hP) + baris('min', '🥤 Minuman', hM) + '</div>' +
+    (daftar.length ? '<label class="menu-item"><input type="checkbox" id="snack-saja"><span>Beli popcorn & minum saja, tidak nonton</span></label>' : '') +
+    `<div class="total">Total: <b id="total">-</b></div><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)}</div>`;
+  const hitung = () => {
+    const q = id => +document.querySelector(`#k-isi [data-id=${id}] .jml`).textContent;
+    const saja = !daftar.length || ($('snack-saja') && $('snack-saja').checked);
+    return { pop: q('pop'), min: q('min'), saja, tot: (saja ? 0 : hT * 2) + q('pop') * hP + q('min') * hM };
+  };
+  kartu('🎬', 'Loket Bioskop', html, 'Bayar', () => {
+    const r = hitung();
+    if (r.saja && !r.pop && !r.min) { hint('Pilih popcorn atau minuman dulu.'); return; }
+    if (!bayar(r.tot)) { hint(`Uangnya nggak cukup. Totalnya ${fmtRp(r.tot)}, sisa uang ${fmtRp(DOMPET.sisa)}.`, 3800); return; }
+    if (r.pop || r.min) { aturBawa(r.pop, r.min); setTimeout(() => bicara(BAWA.cewek.length ? 'Kamu bawa satu, aku bawa satu ya.' : 'Biar aku yang bawa popcorn sama minumnya.', 3.5), 400); }
+    if (!r.saja) { const x = document.querySelector('#k-isi input[name=film]:checked'); mulaiFilm(daftar[x ? +x.value : 0]); }
   });
+  const segar = () => { const r = hitung(); $('total').textContent = fmtRp(r.tot) + (r.tot > DOMPET.sisa ? ' (uang kurang)' : ''); $('k-aksi').textContent = r.saja ? 'Beli' : 'Bayar & nonton 🍿'; };
+  $('k-isi').onclick = (e) => {
+    const b = e.target.closest('.qty'); if (b) { const j = b.closest('.menu-item').querySelector('.jml'); j.textContent = clamp(+j.textContent + +b.dataset.d, 0, 2); }
+    setTimeout(segar, 0);
+  };
+  segar();
 }
 function siapkanVideo(src) {
   const v = document.createElement('video');
@@ -2184,6 +2205,7 @@ function openInter(it) {
   else if (it.kind === 'meja') { if (it.data.penuh) { hint('Meja ini penuh. Cari meja lain yang kosong ya.'); return; } dudukMeja(it.data); return; }
   else if (it.kind === 'bioskop') { if (antriPemain) { hint('Kalian sedang antre.'); return; } if (it.obj === BIOS.layar) bukaFilm(); else tawarAntri(BIOS.antrian, bukaFilm, '🎟️ Loket Tiket'); return; }
   else if (it.kind === 'hidangan') { lihatHidangan(it.data); return; }
+  else if (it.kind === 'pakan') { bukaBooth(it.data); return; }
   else { info = LANDMARK[it.data]; }
   if (!info) return;
   paused = true;
@@ -2231,9 +2253,54 @@ function ukuran(A) {
   return ukuranHewan[A.kind];
 }
 const wortel = new THREE.Group();
-{ const w = mesh(cone(0.03, 0.2, 7), '#f08a24', 0, -0.13, 0, wortel, false); w.rotation.x = Math.PI; for (const a of [-0.4, 0, 0.4]) { const d = mesh(cone(0.012, 0.09, 4), '#4f9a3a', 0, -0.01, 0, wortel, false); d.rotation.z = a; d.position.x = Math.sin(a) * 0.03; } }
+{ const w = new THREE.Mesh(cone(0.03, 0.2, 7), new THREE.MeshLambertMaterial({ color: '#f08a24', flatShading: true })); w.position.y = -0.13; wortel.add(w); w.rotation.x = Math.PI; for (const a of [-0.4, 0, 0.4]) { const d = mesh(cone(0.012, 0.09, 4), '#4f9a3a', 0, -0.01, 0, wortel, false); d.rotation.z = a; d.position.x = Math.sin(a) * 0.03; } }
 wortel.visible = false; kamu.arms[1].hand.add(wortel);
-const PERCIL = { kelinci: ['Kelinci-nya lucu banget. Mau kasih makan?', 'Ih gemas. Kasih wortel yuk?'], _: ['Kayaknya dia lapar. Mau kasih makan?', 'Mau coba kasih wortel?'] };
+// booth pakan di sebelah kandang hewan yang boleh diberi makan
+const PAKAN = D.pakanHewan || {
+  kelinci: [['Wortel', 10000], ['Kangkung', 12000]], zebra: [['Rumput Segar', 10000], ['Wortel', 12000]],
+  unta: [['Rumput Kering', 10000], ['Wortel', 12000]], bison: [['Rumput Segar', 10000], ['Jagung', 15000]],
+  jerapah: [['Daun Akasia', 15000], ['Wortel', 12000]], gajah: [['Pisang', 15000], ['Tebu', 20000]]
+};
+const WARNA_PAKAN = n => /wortel/i.test(n) ? '#f08a24' : /pisang|jagung/i.test(n) ? '#f2d14b' : /tebu/i.test(n) ? '#9a6a3a' : '#5aa83a';
+const STOK = {};
+const stokHewan = (k) => (PAKAN[k] || []).map(([n]) => [n, STOK[k + '|' + n] || 0]).filter(x => x[1] > 0);
+const BOOTH = {};
+function bukaBooth(k) {
+  const info = INFO[k], list = PAKAN[k]; if (!list) return;
+  const html = '<div class="menu">' + list.map(([n, h], j) => `<div class="menu-item" data-j="${j}"><span>${n}<small>${fmtRp(h)} / porsi · punya ${STOK[k + '|' + n] || 0}</small></span><button class="qty" data-d="-1">−</button><b class="jml">0</b><button class="qty" data-d="1">+</button></div>`).join('') + '</div>' +
+    `<div class="total">Total: <b id="total">Rp0</b></div><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)} · 1 porsi untuk 1 kali memberi makan</div>`;
+  kartu('🥕', 'Pakan ' + info.nama, html, 'Beli', () => {
+    let tot = 0; const beli = [];
+    document.querySelectorAll('#k-isi .menu-item').forEach(r => { const q = +r.querySelector('.jml').textContent; if (q) { const [n, h] = list[+r.dataset.j]; tot += q * h; beli.push([n, q]); } });
+    if (!beli.length) { hint('Pilih pakannya dulu.'); return; }
+    if (!bayar(tot)) { hint(`Uangnya nggak cukup. Totalnya ${fmtRp(tot)}, sisa uang ${fmtRp(DOMPET.sisa)}.`, 3800); return; }
+    for (const [n, q] of beli) STOK[k + '|' + n] = (STOK[k + '|' + n] || 0) + q;
+    hint(`Dapat ${beli.map(([n, q]) => q + '× ' + n).join(', ')}. Ketuk kandangnya untuk memberi makan.`, 3500);
+    if (AMATI.aktif && AMATI.A && AMATI.A.kind === k) setTimeout(tanyaMakan, 300);
+  });
+  $('k-isi').onclick = (e) => {
+    const b = e.target.closest('.qty'); if (!b) return;
+    const j = b.closest('.menu-item').querySelector('.jml'); j.textContent = clamp(+j.textContent + +b.dataset.d, 0, 9);
+    let tot = 0; document.querySelectorAll('#k-isi .menu-item').forEach(r => tot += +r.querySelector('.jml').textContent * list[+r.dataset.j][1]);
+    $('total').textContent = fmtRp(tot) + (tot > DOMPET.sisa ? ' (uang kurang)' : '');
+  };
+}
+for (const z of ZONES) {
+  const k = SPES_ZONA[z.id]; if (!z.sign || !PAKAN[k]) continue;
+  const [sx, sz, rot] = z.sign, c = Math.cos(rot), sn = Math.sin(rot);
+  const x = sx + c * 3.4, zz = sz - sn * 3.4;
+  const g = new THREE.Group(); g.position.set(x, 0, zz); g.rotation.y = rot; scene.add(g);
+  mesh(box(1.8, 1.0, 0.9), '#6aa64e', 0, 0.5, 0, g); mesh(box(1.9, 0.06, 1.0), '#f8f4ea', 0, 1.02, 0, g, false);
+  for (const px of [-0.85, 0.85]) mesh(cyl(0.04, 0.04, 1.3, 5), '#6b4a2b', px, 1.65, -0.35, g, false);
+  const atap = mesh(box(2.1, 0.08, 1.3), '#e8836f', 0, 2.32, -0.1, g, false); atap.rotation.x = 0.15;
+  const tulisan = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.5), new THREE.MeshLambertMaterial({ map: textTex(['🥕 Pakan ' + INFO[k].nama], { w: 512, h: 150, size: 56, bg: '#6aa64e', border: '#ffffff' }) }));
+  tulisan.position.set(0, 1.95, 0.08); g.add(tulisan); const bl = tulisan.clone(); bl.rotation.y = Math.PI; bl.position.z = -0.4; g.add(bl);
+  mesh(box(0.5, 0.25, 0.3), '#f08a24', -0.4, 1.17, 0.1, g, false); mesh(box(0.5, 0.25, 0.3), '#5aa83a', 0.35, 1.17, 0.1, g, false);
+  addCircle(x, zz, 1.1);
+  const it = addInteract(g, 'pakan', k, 3.5); it.label = '🥕 Beli pakan ' + INFO[k].nama.toLowerCase();
+  BOOTH[k] = [x, zz];
+}
+const PERCIL = { kelinci: ['Kelinci-nya lucu banget. Mau kasih makan?', 'Ih gemas. Kasih makan yuk?'], _: ['Kayaknya dia lapar. Mau kasih makan?', 'Mau coba kasih makan?'] };
 function mulaiAmati(key, obj) {
   const info = INFO[key]; if (!info) return;
   const list = animals.filter(a => a.kind === key).sort((a, b) => Math.hypot(a.group.position.x - player.x, a.group.position.z - player.z) - Math.hypot(b.group.position.x - player.x, b.group.position.z - player.z));
@@ -2254,10 +2321,20 @@ function mulaiAmati(key, obj) {
   if (info.makan) AMATI.tanyaT = setTimeout(() => { if (AMATI.aktif && !AMATI.suap) tanyaMakan(); }, 1600);
 }
 function tanyaMakan() {
-  const key = AMATI.A.kind, k = PERCIL[key] || PERCIL._;
+  const key = AMATI.A.kind, nama = INFO[key].nama.toLowerCase(), stok = stokHewan(key);
+  $('am-makan').classList.add('sembunyi'); $('am-tanya').classList.remove('sembunyi');
+  if (!stok.length) {
+    bicara(`Beli pakannya dulu yuk di booth sebelah kandang. Mulai ${fmtRp(Math.min(...PAKAN[key].map(x => x[1])))}.`, 5);
+    $('am-tanya-teks').textContent = `Belum punya pakan ${nama}.`;
+    $('am-iya').textContent = 'Beli pakan 🥕'; $('am-tidak').textContent = 'Nanti';
+    AMATI.iya = () => { const b = BOOTH[key]; if (b && Math.hypot(b[0] - player.x, b[1] - player.z) > 40) { hint('Booth pakannya ada di sebelah papan nama kandang. Dekati dulu ya.', 3500); return; } bukaBooth(key); };
+    return;
+  }
+  const k = PERCIL[key] || PERCIL._;
   bicara(pick(k), 5);
-  $('am-tanya-teks').textContent = `Ingin memberi makan ${INFO[key].nama.toLowerCase()}?`;
-  $('am-tanya').classList.remove('sembunyi'); $('am-makan').classList.add('sembunyi');
+  $('am-tanya-teks').textContent = `Ingin memberi makan ${nama}? (punya ${stok.map(([n, q]) => q + '× ' + n).join(', ')})`;
+  $('am-iya').textContent = 'Iya 🥕'; $('am-tidak').textContent = 'Tidak';
+  AMATI.iya = mulaiSuap;
 }
 function pilihHewan(i, awal) {
   const L = AMATI.list; AMATI.idx = (i + L.length) % L.length; const A = AMATI.A = L[AMATI.idx];
@@ -2276,9 +2353,12 @@ function mulaiSuap() {
   const A = AMATI.A; $('am-tanya').classList.add('sembunyi');
   if (Math.hypot(A.group.position.x - player.x, A.group.position.z - player.z) > 40) { hint('Dekati pagarnya dulu ya, lalu beri makan.'); return; }
   const [tx, tz] = clampIn(A.encl, player.x, player.z, A.kind === 'gajah' || A.kind === 'jerapah' ? 1.6 : 0.9);
+  const stok = stokHewan(A.kind); if (!stok.length) { tanyaMakan(); return; }
+  const pakan = stok[0][0]; STOK[A.kind + '|' + pakan]--;
+  wortel.children[0].material.color.set(WARNA_PAKAN(pakan));
   A.state = 'feed'; A.target = [tx, tz]; A.timer = 14;
   wortel.visible = true; wortel.scale.setScalar(A.kind === 'kelinci' ? 0.8 : 1.4);
-  AMATI.suap = { A, dimakan: false, t: 0 };
+  AMATI.suap = { A, dimakan: false, t: 0, pakan };
   bicara(A.kind === 'kelinci' ? 'Sodorkan pelan-pelan, biar kelincinya nggak takut.' : 'Pegang wortelnya yang kuat ya.', 4);
   hint(`${INFO[A.kind].nama} datang mendekat… 🥕`);
 }
@@ -2298,7 +2378,7 @@ function updateAmati(dt) {
     else if (A.state === 'idle' && S.t > 0.5) {
       wortel.visible = false; AMATI.suap = null;
       if (S.dimakan) setTimeout(() => bicara(A.kind === 'kelinci' ? 'Lihat, kelincinya habis makan wortel. Gemas!' : 'Dia suka banget sama wortelnya.', 4), 400);
-      else hint('Sepertinya dia belum lapar. Coba lagi nanti ya.');
+      else { hint('Sepertinya dia belum lapar. Pakannya disimpan dulu.'); STOK[A.kind + '|' + S.pakan] = (STOK[A.kind + '|' + S.pakan] || 0) + 1; }
       const m = $('am-makan'); m.textContent = 'Beri makan lagi 🥕'; m.classList.remove('sembunyi');
     }
   }
@@ -2329,9 +2409,9 @@ $('am-kiri').onclick = () => { if (!AMATI.suap) pilihHewan(AMATI.idx - 1); };
 $('am-kanan').onclick = () => { if (!AMATI.suap) pilihHewan(AMATI.idx + 1); };
 $('am-dekat').onclick = () => { AMATI.zoom = clamp(AMATI.zoom * 0.75, 0.45, 2.2); };
 $('am-jauh').onclick = () => { AMATI.zoom = clamp(AMATI.zoom * 1.33, 0.45, 2.2); };
-$('am-iya').onclick = mulaiSuap;
+$('am-iya').onclick = () => { if (AMATI.iya) AMATI.iya(); };
 $('am-tidak').onclick = () => { $('am-tanya').classList.add('sembunyi'); bicara('Oke, kita lihat-lihat aja ya.', 3); const m = $('am-makan'); m.textContent = 'Beri makan 🥕'; m.classList.remove('sembunyi'); };
-$('am-makan').onclick = () => { $('am-makan').classList.add('sembunyi'); mulaiSuap(); };
+$('am-makan').onclick = () => tanyaMakan();
 canvas.addEventListener('wheel', e => { if (AMATI.aktif) { e.preventDefault(); AMATI.zoom = clamp(AMATI.zoom * (1 + e.deltaY * 0.001), 0.45, 2.2); } }, { passive: false });
 
 /* peta */
@@ -2467,6 +2547,48 @@ function animPerson(P, phase, amt) {
 }
 
 let nearest = null, zonaSekarang = '', kicauT = 3;
+// tiket masuk taman, sekali per hari (hari berganti jam 7 pagi waktu taman)
+const TIKET = { hari: (() => { try { const v = localStorage.getItem('safari_tiket'); return v == null ? null : +v; } catch (e) { return null; } })(), tanyaT: -1e9 };
+function sudahTiket() { cekDompet(); return TIKET.hari === DOMPET.hari; }
+function cekGerbang(zLama) {
+  if (player.z >= 90.6 || zLama < 90.6 || Math.abs(player.x - 30) > 8 || sudahTiket()) return;
+  player.z = 90.6;
+  if (paused || performance.now() - TIKET.tanyaT < 2500) return;
+  TIKET.tanyaT = performance.now();
+  const h = D.tiketMasuk != null ? D.tiketMasuk : 15000, tot = h * 2;
+  kartu('🎟️', 'Tiket Masuk', `<p style="text-align:center">Tiket masuk taman ${fmtRp(h)} per orang.<br>Untuk berdua: <b>${fmtRp(tot)}</b></p><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)} · berlaku sampai jam ${DOMPET.jamReset} pagi besok</div>`, 'Bayar ' + fmtRp(tot), () => {
+    if (!bayar(tot)) { hint('Uangnya nggak cukup untuk tiket masuk.', 3000); return; }
+    TIKET.hari = DOMPET.hari; try { localStorage.setItem('safari_tiket', TIKET.hari); } catch (e) {}
+    hint('Tiket dibayar. Selamat bersenang-senang! 🎉', 3000); setTimeout(() => bicara('Yuk masuk! Jangan lepas tanganku ya.'), 800);
+  });
+  $('k-tutup').textContent = 'Nanti dulu';
+}
+// popcorn & minuman bioskop yang dibawa: tangan tidak bergandengan
+const BAWA = { cowok: [], cewek: [], sejak: 0 };
+const mPopcorn = new THREE.MeshLambertMaterial({ map: tex(64, 64, (c, w, h) => { for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#ffffff' : '#d23a3a'; c.fillRect(i * 8, 0, 8, h); } }) });
+function modelBawaan(jenis) {
+  const g = new THREE.Group();
+  if (jenis === 'popcorn') {
+    const c = new THREE.Mesh(cyl(0.085, 0.06, 0.18, 10), mPopcorn); c.position.y = 0.06; g.add(c);
+    for (let i = 0; i < 7; i++) mesh(sph(0.03, 5, 4), '#f8e7a1', Math.cos(i) * 0.045, 0.16 + (i % 3) * 0.015, Math.sin(i * 1.7) * 0.045, g, false);
+  } else {
+    mesh(cyl(0.05, 0.04, 0.17, 10), '#2f6fb5', 0, 0.06, 0, g, false); mesh(cyl(0.053, 0.053, 0.015, 10), '#ffffff', 0, 0.15, 0, g, false);
+    mesh(cyl(0.006, 0.006, 0.12, 4), '#e8836f', 0.015, 0.2, 0, g, false);
+  }
+  return g;
+}
+function aturBawa(pop, minum) {
+  for (const P of [kamu, dia]) for (const a of P.arms) for (const c of [...a.hand.children]) if (c.userData.bawaan) a.hand.remove(c);
+  const urut = []; for (let i = 0; i < Math.max(pop, minum); i++) { if (i < pop) urut.push('popcorn'); if (i < minum) urut.push('minum'); }
+  BAWA.cowok = urut.length <= 2 ? urut : urut.slice(0, 2); BAWA.cewek = urut.length <= 2 ? [] : urut.slice(2, 4); BAWA.sejak = performance.now();
+  [[dia, BAWA.cowok], [kamu, BAWA.cewek]].forEach(([P, list]) => list.forEach((j, i) => { const m = modelBawaan(j); m.userData.bawaan = true; m.position.y = -0.04; P.arms[i].hand.add(m); }));
+}
+function poseBawa(P, list, phase, amt) {
+  P.arms.forEach((a, i) => {
+    if (list[i]) { swingArm(a, -0.95, i ? -1 : 1); for (const c of a.hand.children) if (c.userData.bawaan) c.rotation.x = 0.95; }
+    else swingArm(a, (i ? 1 : -1) * Math.sin(phase) * 0.5 * amt, i ? -1 : 1);
+  });
+}
 const BALIK = { tahan: false, sisa: 0 };
 function update(dt, t) {
   // gerak
@@ -2487,6 +2609,7 @@ function update(dt, t) {
   mag = Math.min(1, Math.abs(maju));
   const fwdX = -Math.sin(camYaw), fwdZ = -Math.cos(camYaw);
   let mx = fwdX * maju, mz = fwdZ * maju; const ml = Math.hypot(mx, mz);
+  const zSebelum = player.z;
   const run = keys.ShiftLeft || keys.ShiftRight;
   const spd = (run ? 6.5 : 4.2) * mag;
   if (ml > 0.01) {
@@ -2495,6 +2618,7 @@ function update(dt, t) {
     const p = { x: player.x, z: player.z }; resolve(p, 0.38); player.x = p.x; player.z = p.z;
     tabrakNpc(mx, mz);
   }
+  cekGerbang(zSebelum);
   const spdAntri = antriPemain ? gerakAntri(dt) : 0;
   player.speed = lerp(player.speed, Math.max(spd, spdAntri), Math.min(1, dt * 8));
   const targetT = mode === 'tpp' ? 1 : 0;
@@ -2534,6 +2658,8 @@ function update(dt, t) {
     const lengan = duduk.meja ? -1.15 : -0.75;
     if (!animMakan(dt)) { swingArm(kamu.arms[0], lengan, 1); swingArm(kamu.arms[1], lengan, -1); swingArm(dia.arms[0], lengan, 1); swingArm(dia.arms[1], lengan, -1); }
   } else if (animTopi(dt)) {
+  } else if (BAWA.cowok.length || BAWA.cewek.length) {
+    poseBawa(dia, BAWA.cowok, partner.phase, Math.min(1, partner.speed / 3)); poseBawa(kamu, BAWA.cewek, player.phase, Math.min(1, player.speed / 3));
   } else if (AMATI.suap) {
     aimArm(kamu, kamu.arms[0], hand); aimArm(dia, dia.arms[1], hand);
     const A = AMATI.suap.A; A.head.getWorldPosition(tmpB); kamu.arms[1].pivot.getWorldPosition(tmpA);
@@ -2565,6 +2691,7 @@ function update(dt, t) {
   camera.lookAt(camera.position.x + lX, camera.position.y + lY, camera.position.z + lZ);
   if (mode === 'tpp' && modeT > 0.9) camPitch = clamp(camPitch, -0.35, 1.15);
   if (AMATI.aktif) updateAmati(dt);
+  if ((BAWA.cowok.length || BAWA.cewek.length) && !(duduk && duduk.bioskop) && performance.now() - BAWA.sejak > 150000) { aturBawa(0, 0); bicara('Popcorn sama minumnya sudah habis. Gandengan lagi yuk.', 4); }
 
   // bayangan mengikuti pemain
 
@@ -2654,7 +2781,7 @@ function updateAnimal(A, dt, t) {
     A.graze = 0.25 + Math.sin(t * 6) * 0.12;
     A.timer -= dt;
     if (Math.random() < dt * 1.5) { A.head.getWorldPosition(tmpB); hearts(tmpB, 1, Math.random() < 0.5 ? '💛' : '🥕'); }
-    if (A.timer <= 0) { A.state = 'idle'; A.timer = rand(2, 5); A.head.getWorldPosition(tmpB); hearts(tmpB, 4, '💛'); hint(`${INFO[A.kind].nama} senang dengan wortelmu!`); }
+    if (A.timer <= 0) { A.state = 'idle'; A.timer = rand(2, 5); A.head.getWorldPosition(tmpB); hearts(tmpB, 4, '💛'); hint(`${INFO[A.kind].nama} senang diberi makan!`); }
   }
   g.rotation.y = A.yaw;
   A.phase += dt * (moving ? 6 * Math.max(0.6, A.speed) : 0);
@@ -2697,4 +2824,4 @@ function frame() {
 // intro: kamera memutar perlahan di layar mulai
 camYaw = 0;
 frame();
-window.__safari = { DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };

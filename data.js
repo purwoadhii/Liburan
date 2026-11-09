@@ -14,6 +14,22 @@ window.SAFARI = {
   uangHarian: 200000,
   jamReset: 7,
 
+  // Harga (rupiah)
+  hargaMakananMin: 15000,      // harga paling murah per porsi di food court
+  tiketMasuk: 15000,           // per orang, dibayar sekali per hari di gerbang
+  tiketBioskop: 20000,         // per orang
+  hargaPopcorn: 25000,
+  hargaMinumBioskop: 15000,
+  // Pakan di booth sebelah kandang: [nama, harga per porsi]
+  pakanHewan: {
+    kelinci: [['Wortel', 10000], ['Kangkung', 12000]],
+    zebra: [['Rumput Segar', 10000], ['Wortel', 12000]],
+    unta: [['Rumput Kering', 10000], ['Wortel', 12000]],
+    bison: [['Rumput Segar', 10000], ['Jagung', 15000]],
+    jerapah: [['Daun Akasia', 15000], ['Wortel', 12000]],
+    gajah: [['Pisang', 15000], ['Tebu', 20000]]
+  },
+
   // Topi saat siang terik
   tanyaTopi: 'Kamu pasti merasa panas kan? Ingin mengenakan topi?',
   saatPasangTopi: ['Sini, aku pakaikan. Biar kamu nggak kepanasan.'],
