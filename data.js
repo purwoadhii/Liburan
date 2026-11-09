@@ -40,6 +40,12 @@ window.SAFARI = {
   ],
   maafPasangan: ['Maaf ya, nggak sengaja.', 'Maaf, Kak. Kami kurang hati-hati.'],
 
+  // Pengunjung yang minta izin duduk di meja kalian
+  tanyaNumpang: ['Permisi, apakah boleh duduk di sini?', 'Permisi Kak, kursi ini kosong? Boleh saya duduk di sini?'],
+  jawabBoleh: ['Terima kasih ya!', 'Makasih banyak, Kak.'],
+  jawabPelit: ['Dasar pelit!', 'Huh, dasar pelit!'],
+  setelahPelit: ['Biarin aja, kita lagi pengin berdua kan.'],
+
   // Komentar pasangan saat pertama kali masuk sebuah area
   komentarZona: {
     parkir: 'Sudah sampai! Yuk masuk lewat gerbang.',

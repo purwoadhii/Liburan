@@ -1692,7 +1692,38 @@ function tegur(N) {
   gelNpc.textContent = pick(KATA_TABRAK); gelNpc.classList.remove('sembunyi');
   setTimeout(() => bicara(pick(D.maafPasangan || ['Maaf ya, nggak sengaja.']), 3), 3000);
 }
+// pengunjung minta izin duduk di meja kita
+const NUMPANG = { jeda: rand(10, 18), N: null };
+function updateNumpang(dt) {
+  if (NUMPANG.N || !duduk || !duduk.meja || paused) return;
+  NUMPANG.jeda -= dt; if (NUMPANG.jeda > 0) return;
+  NUMPANG.jeda = rand(30, 50);
+  const m = duduk.meja, k = m.kursiU.find(c => !c.n);
+  if (!k || Math.random() < 0.25) return;
+  const lorong = m.x < 45 ? 46.75 : m.x - 3.25;
+  const N = npcGedung(buatNpc([FC_PINTU[0], FC_PINTU[1] - 0.4]), 'fc'); N.speed = rand(1.2, 1.5);
+  k.n = N; N.kursiFC = k; NUMPANG.N = N;
+  const duduki = () => { N.jalur = [[k.x, k.z]]; N.onArrive = () => { npcDuduk(N, k.x, k.z, Math.PI); N.makan = true; N.makanSisa = rand(35, 60); }; };
+  N.jalur = [[lorong, 77.2], [lorong, k.z - 1.0], [k.x, k.z - 1.0]];
+  N.onArrive = () => {
+    if (!duduk || duduk.meja !== m) { NUMPANG.N = null; duduki(); return; }
+    N.yaw = Math.atan2(-(player.x - N.x), -(player.z - N.z));
+    const tanya = pick(D.tanyaNumpang || ['Permisi, apakah boleh duduk di sini?']);
+    npcBicara = N; npcBicaraT = 99; gelNpc.textContent = tanya; gelNpc.classList.remove('sembunyi');
+    kartu('🙋', 'Pengunjung bertanya', `<p style="text-align:center;font-size:17px">"${tanya}"</p>`, 'Boleh 😊', () => {
+      NUMPANG.N = null; npcBicaraT = 2.5; gelNpc.textContent = pick(D.jawabBoleh || ['Terima kasih ya!']); duduki();
+    });
+    $('k-tutup').textContent = 'Tidak';
+    kartuTidak = () => {
+      NUMPANG.N = null; k.n = null; N.kursiFC = null;
+      npcBicaraT = 3; gelNpc.textContent = pick(D.jawabPelit || ['Dasar pelit!']);
+      N.diamT = 1.2; N.jalur = [[lorong, k.z - 1.0], [lorong, 77.2], FC_PINTU, [rand(40, 85), 88]]; N.pergi = true;
+      setTimeout(() => bicara(pick(D.setelahPelit || ['Biarin aja, kita lagi pengin berdua kan.']), 3), 3200);
+    };
+  };
+}
 function updateTegur(dt) {
+  updateNumpang(dt);
   if (tegurJeda > 0) tegurJeda -= dt;
   if (npcBicaraT > 0) {
     npcBicaraT -= dt;
@@ -2294,7 +2325,7 @@ $('btn-mulai').onclick = () => {
   setModeLabel();
   $('mulai').classList.add('sembunyi'); $('hud').classList.remove('sembunyi');
   started = true; initAudio();
-  hint('Joystick: atas maju, kiri-kanan belok · geser layar untuk melihat · ketuk hewan untuk info', 5200);
+  hint('Joystick: atas maju, kiri-kanan belok, bawah berbalik · geser layar untuk melihat · ketuk hewan untuk info', 5200);
   setTimeout(() => bicara((D.komentarZona || {}).parkir || 'Yuk jalan!'), 1200);
   visited.add('parkir');
 };
@@ -2318,6 +2349,7 @@ function animPerson(P, phase, amt) {
 }
 
 let nearest = null, zonaSekarang = '', kicauT = 3;
+const BALIK = { tahan: false, sisa: 0 };
 function update(dt, t) {
   // gerak
   let jx = joy.x, jy = joy.y;
@@ -2328,12 +2360,17 @@ function update(dt, t) {
   // kiri-kanan = berbelok (memutar arah), maju-mundur = jalan
   const belok = Math.abs(jx) < 0.12 ? 0 : jx;
   camYaw -= belok * 2.1 * dt;
-  const maju = Math.abs(jy) < 0.12 ? 0 : jy;
+  // tarik ke bawah = berbalik badan, lalu jalan ke arah sebaliknya
+  const bawah = jy < -0.45 && Math.abs(jx) < Math.abs(jy);
+  if (bawah && !BALIK.tahan) { BALIK.tahan = true; BALIK.sisa = Math.PI; }
+  if (!bawah) BALIK.tahan = false;
+  if (BALIK.sisa > 0) { const st = Math.min(BALIK.sisa, 5.5 * dt); camYaw += st; BALIK.sisa -= st; }
+  const maju = BALIK.sisa > 0 ? 0 : bawah ? -jy : Math.abs(jy) < 0.12 ? 0 : Math.max(0, jy);
   mag = Math.min(1, Math.abs(maju));
   const fwdX = -Math.sin(camYaw), fwdZ = -Math.cos(camYaw);
   let mx = fwdX * maju, mz = fwdZ * maju; const ml = Math.hypot(mx, mz);
   const run = keys.ShiftLeft || keys.ShiftRight;
-  const spd = (run ? 6.5 : 4.2) * mag * (maju < 0 ? 0.6 : 1);
+  const spd = (run ? 6.5 : 4.2) * mag;
   if (ml > 0.01) {
     mx /= ml; mz /= ml;
     player.x += mx * spd * dt; player.z += mz * spd * dt;
@@ -2349,7 +2386,7 @@ function update(dt, t) {
   if (antriPemain) {}
   else if (AMATI.suap) { const A = AMATI.suap.A; const want = Math.atan2(-(A.group.position.x - player.x), -(A.group.position.z - player.z)); player.yaw += angDiff(player.yaw, want) * Math.min(1, dt * 4); camYaw = player.yaw; }
   else if (modeT < 0.5 || mode === 'fpp') player.yaw += angDiff(player.yaw, camYaw) * Math.min(1, dt * 10);
-  else if (ml > 0.01 || belok) player.yaw += angDiff(player.yaw, camYaw) * Math.min(1, dt * 7);
+  else if (ml > 0.01 || belok || BALIK.sisa > 0) player.yaw += angDiff(player.yaw, camYaw) * Math.min(1, dt * 7);
   player.phase += player.speed * dt * 2.6;
 
   kamu.group.position.set(player.x, kamu.group.position.y, player.z);
@@ -2542,4 +2579,4 @@ function frame() {
 // intro: kamera memutar perlahan di layar mulai
 camYaw = 0;
 frame();
-window.__safari = { AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
