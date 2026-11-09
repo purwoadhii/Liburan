@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Admin Bioskop</title>
+<title>Admin Safari</title>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--hijau:#2f5d3a;--krem:#fffaf0;--teks:#26302a;--garis:#e2dccd;--merah:#b23b3b}
@@ -12,6 +12,7 @@
 body{margin:0;background:#f1ece0;font-family:Fredoka,system-ui,sans-serif;color:var(--teks)}
 main{max-width:720px;margin:0 auto;padding:20px 16px 60px}
 h1{color:var(--hijau);margin:0 0 4px}
+h3{margin:22px 0 0;color:var(--hijau);font-size:17px}h3 small{font-weight:400}
 .kartu{background:var(--krem);border-radius:18px;padding:18px;margin:16px 0;box-shadow:0 4px 14px rgba(0,0,0,.08)}
 label{display:block;font-weight:500;margin:12px 0 4px}
 input,textarea{width:100%;font:inherit;padding:10px 12px;border:1.5px solid var(--garis);border-radius:12px;background:#fff}
@@ -40,8 +41,8 @@ progress{width:100%;height:10px}
 </head>
 <body>
 <main>
-  <h1>🎬 Admin Bioskop</h1>
-  <p class="kecil">Film yang ditambahkan di sini muncul di bioskop game. Perubahan disimpan langsung ke repo <b>purwoadhii/Liburan</b> dan tampil di game sekitar 1–2 menit kemudian.</p>
+  <h1>🎬 Admin Safari</h1>
+  <p class="kecil">Film bioskop dan kejutan yang diatur di sini muncul di game. Perubahan disimpan langsung ke repo <b>purwoadhii/Liburan</b> dan tampil di game sekitar 1–2 menit kemudian.</p>
 
   <div class="kartu" id="k-masuk">
     <label for="token">Token GitHub</label>
@@ -60,6 +61,39 @@ progress{width:100%;height:10px}
       <label for="penonton">Jumlah penonton lain di bioskop</label>
       <input id="penonton" type="number" min="0" max="60" value="24">
       <div class="baris"><button class="utama" id="simpan-pengaturan">Simpan</button></div>
+    </div>
+    <div class="kartu" id="k-kejutan">
+      <h2 style="margin:0">🎁 Kejutan di taman</h2>
+      <p class="kecil">Isi kejutan yang muncul di game. Tekan <b>Simpan kejutan</b> di bawah setelah selesai mengubah.</p>
+      <h3>🐰 Surat dari kelinci <small>(setelah kelinci diberi makan)</small></h3>
+      <label>Judul surat</label><input id="kj-kelinci-judul" maxlength="60">
+      <label>Isi surat</label><textarea id="kj-kelinci-isi" maxlength="1200"></textarea>
+      <h3>🐘 Surat berlumpur dari gajah <small>(1 dari 3 gajah, setelah diberi makan)</small></h3>
+      <label>Judul surat</label><input id="kj-gajah-judul" maxlength="60">
+      <label>Isi surat</label><textarea id="kj-gajah-isi" maxlength="1200"></textarea>
+      <h3>🦒 Bunga dari jerapah</h3>
+      <label>Pesan saat bunga diberikan</label><textarea id="kj-jerapah" maxlength="400"></textarea>
+      <h3>✨ Kunang-kunang di air terjun <small>(malam, 21.00–02.00)</small></h3>
+      <label>Tulisan</label><input id="kj-kunang" maxlength="30" placeholder="I ❤ U">
+      <small>Singkat saja supaya terbaca, misalnya nama atau I ❤ U. Pakai tanda | untuk 2 baris, contoh: Selamat|Ulang Tahun</small>
+      <h3>🎞️ Kenangan di bioskop <small>(diputar di layar setelah film selesai)</small></h3>
+      <label>Foto kenangan <small>(boleh pilih beberapa sekaligus, maksimal 10)</small></label>
+      <input id="kj-foto" type="file" accept="image/*" multiple>
+      <div id="kj-foto-ada" class="kecil" style="margin-top:6px"></div>
+      <label>Video kenangan <small>(opsional, MP4 maksimal sekitar 90 MB)</small></label>
+      <input id="kj-video" type="file" accept="video/mp4,video/webm">
+      <div id="kj-video-ada" class="kecil" style="margin-top:6px"></div>
+      <label>Pesan penutup</label><textarea id="kj-pesan" maxlength="500"></textarea>
+      <h3>🎂 Kue ulang tahun <small>(dibawa pelayan saat menunggu pesanan makanan)</small></h3>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input id="kj-ultah-aktif" type="checkbox" style="width:auto"> Aktifkan kejutan kue ulang tahun</label>
+      <label>Nama yang berulang tahun</label><input id="kj-ultah-nama" maxlength="40">
+      <label>Ucapan di kartu</label><textarea id="kj-ultah-ucapan" maxlength="500"></textarea>
+      <label>Kata dari pasangan setelah tiup lilin</label><textarea id="kj-ultah-kata" maxlength="300"></textarea>
+      <label>Backsound <small>(MP3/M4A, maksimal sekitar 15 MB)</small></label>
+      <input id="kj-lagu" type="file" accept="audio/*">
+      <div id="kj-lagu-ada" class="kecil" style="margin-top:6px"></div>
+      <progress id="kj-progres" class="sembunyi"></progress>
+      <div class="baris"><button class="utama" id="kj-simpan">Simpan kejutan</button></div>
     </div>
     <div class="kartu">
       <h2 style="margin:0">Lihat hasil</h2>
@@ -220,12 +254,84 @@ $('simpan-pengaturan').onclick = async () => {
   try { await simpanData('Ubah jumlah penonton'); status('Tersimpan.'); } catch (er) { status('Gagal: ' + er.message, 6000); }
 };
 
+// ---------- kejutan ----------
+let kj = {};
+const KJ_AWAL = { kelinci: { judul: '', isi: '' }, gajah: { judul: '', isi: '' }, jerapah: '', kunang: '', kenangan: { pesan: '', foto: [], video: '' }, ultah: { aktif: true, nama: '', ucapan: '', kataPasangan: '', lagu: '' } };
+async function muatKejutan() {
+  const f = await gh('kejutan.js');
+  kj = JSON.parse(JSON.stringify(KJ_AWAL));
+  if (f) { const m = utf8b64(f.content).match(/window\.KEJUTAN\s*=\s*([\s\S]*?);\s*$/); try { const d = JSON.parse(m[1]); kj = { ...kj, ...d, kelinci: { ...kj.kelinci, ...(d.kelinci || {}) }, gajah: { ...kj.gajah, ...(d.gajah || {}) }, kenangan: { ...kj.kenangan, ...(d.kenangan || {}) }, ultah: { ...kj.ultah, ...(d.ultah || {}) } }; } catch (e) {} }
+  tampilKejutan();
+}
+function tampilKejutan() {
+  $('kj-kelinci-judul').value = kj.kelinci.judul || ''; $('kj-kelinci-isi').value = kj.kelinci.isi || '';
+  $('kj-gajah-judul').value = kj.gajah.judul || ''; $('kj-gajah-isi').value = kj.gajah.isi || '';
+  $('kj-jerapah').value = kj.jerapah || ''; $('kj-kunang').value = kj.kunang || '';
+  $('kj-pesan').value = kj.kenangan.pesan || '';
+  $('kj-ultah-aktif').checked = kj.ultah.aktif !== false; $('kj-ultah-nama').value = kj.ultah.nama || '';
+  $('kj-ultah-ucapan').value = kj.ultah.ucapan || ''; $('kj-ultah-kata').value = kj.ultah.kataPasangan || '';
+  for (const id of ['kj-foto', 'kj-video', 'kj-lagu']) $(id).value = '';
+  const foto = kj.kenangan.foto || [];
+  $('kj-foto-ada').innerHTML = foto.length ? `${foto.length} foto tersimpan: ` + foto.map(p => `<img src="../${esc(p)}?t=${Date.now()}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;vertical-align:middle;margin:2px">`).join('') + ' <button id="kj-foto-hapus" class="hapus" style="padding:4px 12px">Hapus semua foto</button>' : 'Belum ada foto.';
+  $('kj-video-ada').innerHTML = kj.kenangan.video ? `Video tersimpan. <button id="kj-video-hapus" class="hapus" style="padding:4px 12px">Hapus video</button>` : 'Belum ada video.';
+  $('kj-lagu-ada').innerHTML = kj.ultah.lagu ? `<audio controls src="../${esc(kj.ultah.lagu)}" style="width:100%;margin-top:4px"></audio><button id="kj-lagu-hapus" class="hapus" style="padding:4px 12px;margin-top:6px">Hapus backsound</button>` : 'Belum ada backsound. Tanpa backsound, game memutar melodi selamat ulang tahun sederhana.';
+  if ($('kj-foto-hapus')) $('kj-foto-hapus').onclick = () => { if (confirm('Hapus semua foto kenangan?')) { KJ_HAPUS.push(...foto); kj.kenangan.foto = []; tampilKejutan(); status('Foto dihapus. Tekan Simpan kejutan untuk menyimpan.', 4000); } };
+  if ($('kj-video-hapus')) $('kj-video-hapus').onclick = () => { KJ_HAPUS.push(kj.kenangan.video); kj.kenangan.video = ''; tampilKejutan(); status('Video dihapus. Tekan Simpan kejutan untuk menyimpan.', 4000); };
+  if ($('kj-lagu-hapus')) $('kj-lagu-hapus').onclick = () => { KJ_HAPUS.push(kj.ultah.lagu); kj.ultah.lagu = ''; tampilKejutan(); status('Backsound dihapus. Tekan Simpan kejutan untuk menyimpan.', 4000); };
+}
+const KJ_HAPUS = [];
+function fotoB64(file) {
+  return new Promise((ok, no) => {
+    const img = new Image(); img.onload = () => {
+      const s = Math.min(1, 1280 / Math.max(img.width, img.height)), w = Math.round(img.width * s), h = Math.round(img.height * s);
+      const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+      ok(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+    }; img.onerror = no; img.src = URL.createObjectURL(file);
+  });
+}
+$('kj-simpan').onclick = async () => {
+  const btn = $('kj-simpan'); btn.disabled = true; $('kj-progres').classList.remove('sembunyi');
+  try {
+    kj.kelinci = { judul: $('kj-kelinci-judul').value.trim(), isi: $('kj-kelinci-isi').value.trim() };
+    kj.gajah = { judul: $('kj-gajah-judul').value.trim(), isi: $('kj-gajah-isi').value.trim() };
+    kj.jerapah = $('kj-jerapah').value.trim(); kj.kunang = $('kj-kunang').value.trim();
+    kj.kenangan.pesan = $('kj-pesan').value.trim();
+    kj.ultah = { ...kj.ultah, aktif: $('kj-ultah-aktif').checked, nama: $('kj-ultah-nama').value.trim(), ucapan: $('kj-ultah-ucapan').value.trim(), kataPasangan: $('kj-ultah-kata').value.trim() };
+    const id = Date.now().toString(36);
+    const foto = [...$('kj-foto').files].slice(0, Math.max(0, 10 - (kj.kenangan.foto || []).length));
+    for (let i = 0; i < foto.length; i++) {
+      status(`Mengunggah foto ${i + 1} dari ${foto.length}…`, 0);
+      const p = `kejutan/foto-${id}-${i}.jpg`; await tulis(p, await fotoB64(foto[i]), 'Foto kenangan'); kj.kenangan.foto.push(p);
+    }
+    const vf = $('kj-video').files[0];
+    if (vf) {
+      if (vf.size > 90 * 1024 * 1024) throw new Error('Video lebih dari 90 MB. Kompres dulu.');
+      status('Mengunggah video… jangan tutup halaman ini.', 0);
+      const p = `kejutan/video-${id}.${(vf.name.split('.').pop() || 'mp4').toLowerCase()}`; await tulis(p, await fileB64(vf), 'Video kenangan');
+      if (kj.kenangan.video) KJ_HAPUS.push(kj.kenangan.video); kj.kenangan.video = p;
+    }
+    const lf = $('kj-lagu').files[0];
+    if (lf) {
+      if (lf.size > 15 * 1024 * 1024) throw new Error('Backsound lebih dari 15 MB.');
+      status('Mengunggah backsound…', 0);
+      const p = `kejutan/lagu-${id}.${(lf.name.split('.').pop() || 'mp3').toLowerCase()}`; await tulis(p, await fileB64(lf), 'Backsound ulang tahun');
+      if (kj.ultah.lagu) KJ_HAPUS.push(kj.ultah.lagu); kj.ultah.lagu = p;
+    }
+    status('Menyimpan kejutan…', 0);
+    const teks = '// Isi kejutan di taman safari. Diatur lewat halaman admin (/admin/).\nwindow.KEJUTAN = ' + JSON.stringify(kj, null, 2) + ';\n';
+    await tulis('kejutan.js', b64utf8(teks), 'Ubah kejutan');
+    while (KJ_HAPUS.length) { const p = KJ_HAPUS.shift(); if (p && p.startsWith('kejutan/')) await hapusFile(p).catch(() => {}); }
+    tampilKejutan(); status('Kejutan tersimpan! Muncul di game dalam 1–2 menit.', 4500);
+  } catch (er) { status('Gagal: ' + er.message, 7000); }
+  btn.disabled = false; $('kj-progres').classList.add('sembunyi');
+};
+
 async function masuk() {
   token = $('token').value.trim() || token;
   if (!token) { status('Isi token dulu.'); return; }
   status('Memeriksa…', 0);
   try {
-    await muat();
+    await muat(); await muatKejutan();
     if ($('ingat').checked) localStorage.setItem('liburan_token', token); else localStorage.removeItem('liburan_token');
     $('isi').classList.remove('sembunyi'); $('k-masuk').classList.add('sembunyi');
     status('Berhasil masuk.');
@@ -233,7 +339,7 @@ async function masuk() {
 }
 $('masuk').onclick = masuk;
 $('keluar').onclick = () => { localStorage.removeItem('liburan_token'); token = ''; $('token').value = ''; $('isi').classList.add('sembunyi'); $('k-masuk').classList.remove('sembunyi'); };
-$('muat-ulang').onclick = () => muat().then(() => status('Daftar film dimuat ulang.')).catch(er => status('Gagal: ' + er.message, 6000));
+$('muat-ulang').onclick = () => muat().then(muatKejutan).then(() => status('Daftar film dimuat ulang.')).catch(er => status('Gagal: ' + er.message, 6000));
 $('token').onkeydown = e => { if (e.key === 'Enter') masuk(); };
 if (token) { $('token').value = token; $('k-masuk').classList.add('sembunyi'); masuk().then(() => { if (!$('isi').classList.contains('sembunyi')) return; $('k-masuk').classList.remove('sembunyi'); }); }
 </script>
