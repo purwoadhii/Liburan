@@ -1,5 +1,5 @@
 // Daftar film bioskop. Diisi lewat halaman admin (/admin/).
 window.FILM = {
-  "penonton": 22,
+  "penonton": 40,
   "daftar": []
 };

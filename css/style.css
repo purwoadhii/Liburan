@@ -66,7 +66,7 @@ h2{margin:4px 0 8px;color:var(--hijau)}
 #foto-img{width:100%;border-radius:14px;display:block}
 
 #btn-makan{background:var(--aksen);color:#fff;padding:12px 20px;border-radius:999px;font-size:16px;font-weight:500;box-shadow:var(--bayang)}
-#btn-berdiri{background:#fffaf0;color:var(--teks);padding:11px 18px;border-radius:999px;font-size:15px;font-weight:500;box-shadow:var(--bayang)}
+#btn-antri,#btn-berdiri{background:#fffaf0;color:var(--teks);padding:11px 18px;border-radius:999px;font-size:15px;font-weight:500;box-shadow:var(--bayang)}
 .menu{display:flex;flex-direction:column;gap:8px;margin:6px 0}
 .menu-item{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid #e6e1d4;border-radius:14px;padding:10px 12px;cursor:pointer}
 .menu-item span{flex:1}
@@ -82,3 +82,5 @@ h2{margin:4px 0 8px;color:var(--hijau)}
 .menu-item .qty{width:34px;height:34px;border-radius:50%;background:#e9ece6;font-size:18px;line-height:1;padding:0;margin:0;color:var(--teks)}
 .menu-item .jml{min-width:18px;text-align:center}
 .total{text-align:right;margin:4px 2px 0;font-size:15px}
+#pratinjau{width:100%;height:auto;border-radius:14px;background:radial-gradient(circle,#fffaf0,#e9dcc0);display:block}
+.ket-hidangan{margin:8px 0;font-size:15px}

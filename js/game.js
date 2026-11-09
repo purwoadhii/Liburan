@@ -906,7 +906,7 @@ let pesanan = [];
     const c = Math.cos(r), sn = Math.sin(r);
     const wp = (lx, lz) => [x + lx * c + lz * sn, z - lx * sn + lz * c];
     const a = wp(-1.75, 1.3), b = wp(1.75, 1.3); addSeg(a[0], a[1], b[0], b[1]);
-    const it = addInteract(g, 'kios', i, 3.6); it.label = 'Pesan di ' + k.nama; it.pusat = wp(0, 1.8); k.depan = wp(0, 2.1);
+    const it = addInteract(g, 'kios', i, 3.6); it.label = 'Pesan di ' + k.nama; it.pusat = wp(0, 1.8); k.depan = wp(0, 2.1); k.posisi = [x, z];
   });
   // meja
   for (const tx of [43.5, 50, 56.5]) for (const tz of [65.5, 70, 74.5]) {
@@ -917,18 +917,19 @@ let pesanan = [];
       mesh(cyl(0.04, 0.04, 0.44, 5), '#555', cx, 0.22, cz, g, false);
     }
     addCircle(tx - 0.5, tz, 0.55); addCircle(tx + 0.5, tz, 0.55);
-    const m = { x: tx, z: tz, g, makanan: [] };
+    const m = { x: tx, z: tz, g, makanan: [], kursiU: [{ x: tx - 0.45, z: tz - 0.85, n: null }, { x: tx + 0.45, z: tz - 0.85, n: null }] };
     MEJA.push(m);
     const it = addInteract(g, 'meja', m, 2.4); it.label = 'Duduk di sini';
   }
   // pengunjung yang sedang makan
   MEJA.forEach((m, i) => {
-    if (i === 4 || Math.random() < 0.3) return;
-    for (const sx of [-0.45, 0.45]) if (Math.random() < 0.75) { const N = buatNpc([m.x + sx, m.z - 0.85]); npcDuduk(N, m.x + sx, m.z - 0.85, Math.PI); N.makan = true; }
+    for (const k of m.kursiU) if (Math.random() < 0.6) { const N = npcGedung(buatNpc([k.x, k.z]), 'fc'); npcDuduk(N, k.x, k.z, Math.PI); N.makan = true; N.makanSisa = rand(10, 70); N.kursiFC = k; k.n = N; }
+    if (i === 4) return;
+    if (Math.random() < 0.3) { m.penuh = true; for (const sx of [-0.45, 0.45]) { const N = npcGedung(buatNpc([m.x + sx, m.z + 0.85]), 'fc'); npcDuduk(N, m.x + sx, m.z + 0.85, 0); N.makan = true; } }
     if (Math.random() < 0.5) mesh(cyl(0.16, 0.12, 0.1, 8), '#f8f4ea', m.x, 0.85, m.z - 0.2, scene, false);
   });
   // pengunjung yang berjalan di dalam
-  for (let i = 0; i < 4; i++) { const N = buatNpc([rand(44, 56), rand(63, 76)]); N.keliling = fc; }
+  for (let i = 0; i < 3; i++) { const N = npcGedung(buatNpc([rand(44, 56), rand(63, 76)]), 'fc'); N.keliling = fc; }
 }
 
 /* ---------- bioskop ---------- */
@@ -969,6 +970,136 @@ const BIOS = { x1: 64, z1: 56, x2: 86, z2: 80, kursi: [], film: null, video: nul
   const it2 = addInteract(BIOS.layar, 'bioskop', null, 0); it2.label = '🎬 Pilih film';
 }
 
+
+/* ---------- antrean kios & loket, keramaian ---------- */
+const ANTRIAN = [];
+const FC_PINTU = [50, 79.2];
+let antriPemain = null;
+function buatAntrian(pos, dir, jenis, data, target) {
+  const q = { pos, dir, jenis, data, list: [], layan: 0, target, waktuLayan: rand(3.5, 6) };
+  ANTRIAN.push(q); return q;
+}
+const slotAntri = (q, n) => [q.pos[0] + q.dir[0] * n * 0.95, q.pos[1] + q.dir[1] * n * 0.95];
+const arahAntri = (q) => Math.atan2(q.dir[0], q.dir[1]);
+function npcGedung(N, id) { N.gedung = id; return N; }
+function kursiKosong() {
+  const bebas = [];
+  for (const m of MEJA) for (const k of m.kursiU) if (!k.n) bebas.push(k);
+  return bebas.length ? pick(bebas) : null;
+}
+function tambahKeAntrian(q, N) {
+  q.list.push(N); N.antri = q; N.jalur = []; N.diamT = 0;
+}
+function spawnAntri(q) {
+  let N;
+  if (q.jenis === 'kios') { N = npcGedung(buatNpc([FC_PINTU[0] + rand(-3, 3), 82]), 'fc'); N.x = FC_PINTU[0] + rand(-3, 3); N.z = 82; }
+  else { N = npcGedung(buatNpc([rand(52, 84), 88.6]), 'bios'); }
+  N.speed = rand(1.2, 1.6);
+  tambahKeAntrian(q, N);
+}
+function selesaiLayan(q, N) {
+  q.list.shift(); N.antri = null; q.layan = 0; q.waktuLayan = rand(3.5, 6.5);
+  if (q.jenis === 'kios') {
+    const k = kursiKosong();
+    if (k && Math.random() < 0.8) {
+      k.n = N; N.kursiFC = k;
+      N.jalur = [[N.x, k.z - 1.3], [k.x, k.z - 1.3], [k.x, k.z]];
+      N.onArrive = () => { npcDuduk(N, k.x, k.z, Math.PI); N.makan = true; N.makanSisa = rand(25, 50); };
+    } else { N.jalur = [FC_PINTU, [rand(40, 85), 88]]; N.pergi = true; }
+  } else {
+    N.jalur = [[67.3, 82], [67.3, 77]]; N.pergi = true;
+  }
+}
+function updateAntrian(dt) {
+  for (const q of ANTRIAN) {
+    const npcN = q.list.filter(m => m !== 'pemain').length;
+    if (npcN < q.target && Math.random() < dt * 0.25) spawnAntri(q);
+    q.list.forEach((m, idx) => {
+      if (m === 'pemain') return;
+      const [tx, tz] = slotAntri(q, idx);
+      const d = Math.hypot(tx - m.x, tz - m.z);
+      if (d > 0.2) { if (!m.jalur.length || Math.hypot(m.jalur[m.jalur.length - 1][0] - tx, m.jalur[m.jalur.length - 1][1] - tz) > 0.1) m.jalur = [[tx, tz]]; }
+      else { m.jalur = []; m.yaw += angDiff(m.yaw, arahAntri(q)) * 0.2; }
+    });
+    const depan = q.list[0];
+    if (!depan) continue;
+    const [fx, fz] = slotAntri(q, 0);
+    const siap = depan === 'pemain' ? Math.hypot(player.x - fx, player.z - fz) < 0.35 : Math.hypot(depan.x - fx, depan.z - fz) < 0.3;
+    if (!siap) continue;
+    q.layan += dt;
+    if (depan === 'pemain') {
+      if (q.layan > 1.2 && !antriPemain.dilayani) {
+        antriPemain.dilayani = true;
+        if (q.jenis === 'kios') bukaKios(q.data); else bukaFilm();
+      }
+    } else if (q.layan > q.waktuLayan) selesaiLayan(q, depan);
+  }
+}
+function masukAntrian(q) {
+  const di = q.list.filter(m => m !== 'pemain').length;
+  if (!di) return false;
+  q.list.push('pemain'); antriPemain = { q, dilayani: false };
+  hint(`Antre dulu ya, ada ${di} orang di depan kalian.`, 3200);
+  setTimeout(() => bicara(pick(['Nggak apa-apa antre, yang penting sama kamu.', 'Ramai banget ya. Kita antre bareng.', 'Sabar ya, sebentar lagi giliran kita.'])), 1400);
+  $('btn-antri').classList.remove('sembunyi');
+  return true;
+}
+function keluarAntrian() {
+  if (!antriPemain) return;
+  const q = antriPemain.q, i = q.list.indexOf('pemain');
+  if (i >= 0) q.list.splice(i, 1);
+  if (i === 0) q.layan = 0;
+  antriPemain = null; $('btn-antri').classList.add('sembunyi');
+}
+function gerakAntri(dt) {
+  const q = antriPemain.q, idx = q.list.indexOf('pemain');
+  const [tx, tz] = slotAntri(q, idx);
+  const dx = tx - player.x, dz = tz - player.z, d = Math.hypot(dx, dz);
+  if (d > 0.05) { const st = Math.min(d, 2 * dt); player.x += dx / d * st; player.z += dz / d * st; }
+  player.yaw += angDiff(player.yaw, arahAntri(q)) * Math.min(1, dt * 6);
+  return d > 0.05 ? 2 : 0;
+}
+// antrean tiap kios & loket tiket
+KIOS.forEach((k, i) => {
+  const dx = k.depan[0] - k.posisi[0], dz = k.depan[1] - k.posisi[1], L = Math.hypot(dx, dz);
+  k.antrian = buatAntrian(k.depan, [dx / L, dz / L], 'kios', i, 1 + Math.floor(Math.random() * 3));
+  for (let n = 0; n < k.antrian.target; n++) { const [x, z] = slotAntri(k.antrian, n); const N = npcGedung(buatNpc([x, z]), 'fc'); N.x = x; N.z = z; N.yaw = arahAntri(k.antrian); tambahKeAntrian(k.antrian, N); }
+});
+BIOS.antrian = buatAntrian([72.5, 84.7], [0, 1], 'tiket', null, 4);
+for (let n = 0; n < 4; n++) { const [x, z] = slotAntri(BIOS.antrian, n); const N = npcGedung(buatNpc([x, z]), 'bios'); N.x = x; N.z = z; tambahKeAntrian(BIOS.antrian, N); }
+$('btn-antri').onclick = () => { keluarAntrian(); hint('Kalian keluar dari antrean.'); };
+
+/* ---------- lihat hidangan dari dekat ---------- */
+let pratinjau = null;
+function lihatHidangan(p) {
+  const html = `<canvas id="pratinjau" width="520" height="340"></canvas><p class="ket-hidangan">${KET_MENU[p.jenis] || ''}</p><div class="catatan">${p.emoji} ${p.nama}${p.harga ? ' · ' + rupiah(p.harga) : ''}${p.sisa < 0.98 ? ` · sisa ${Math.round(p.sisa * 100)}%` : ''}</div>`;
+  kartu(p.emoji, p.nama, html, p.sisa > 0.02 && duduk && duduk.meja === p.meja ? (p.minum ? 'Minum 🥤' : 'Makan 🍽️') : null, () => mulaiMakan());
+  try {
+    if (!pratinjau) {
+      pratinjau = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(35, 520 / 340, 0.01, 10) };
+      pratinjau.scene.add(new THREE.HemisphereLight('#ffffff', '#b8a68a', 2.2));
+      const dl = new THREE.DirectionalLight('#fff3dc', 2); dl.position.set(1, 2, 1.5); pratinjau.scene.add(dl);
+      const alas = mesh(cyl(0.4, 0.4, 0.02, 32), '#8b6440', 0, -0.012, 0, pratinjau.scene, false);
+    }
+    const cv = $('pratinjau');
+    if (pratinjau.r) pratinjau.r.dispose();
+    pratinjau.r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+    pratinjau.r.setPixelRatio(1);
+    if (pratinjau.obj) pratinjau.scene.remove(pratinjau.obj);
+    const salin = { ...p }; const obj = modelMenu(salin); salin.sisa = p.sisa; aturSisa(salin);
+    pratinjau.scene.add(obj); pratinjau.obj = obj;
+    const t0 = performance.now();
+    const loop = () => {
+      if ($('kartu').classList.contains('sembunyi') || !document.body.contains(cv)) { pratinjau.r.dispose(); pratinjau.r = null; return; }
+      const a = (performance.now() - t0) / 2400;
+      pratinjau.cam.position.set(Math.sin(a) * 0.42, 0.34, Math.cos(a) * 0.42); pratinjau.cam.lookAt(0, 0.06, 0);
+      pratinjau.r.render(pratinjau.scene, pratinjau.cam);
+      requestAnimationFrame(loop);
+    };
+    loop();
+  } catch (e) {}
+}
+
 /* ---------- kartu bantu ---------- */
 function kartu(emoji, judul, html, aksiLabel, aksiFn) {
   paused = true;
@@ -986,7 +1117,7 @@ function bukaKios(i) {
     const dipilih = [];
     document.querySelectorAll('#k-isi .menu-item').forEach(r => { const n = +r.querySelector('.jml').textContent; for (let q = 0; q < n; q++) dipilih.push(k.menu[+r.dataset.j]); });
     if (!dipilih.length) { hint('Belum ada menu yang dipilih.'); return; }
-    for (const m of dipilih) pesanan.push({ nama: m[0], emoji: k.emoji, warna: k.warna, kios: i, minum: /^(Es |Jus|Teh|Kopi|Cappuccino|Coklat Panas|Ocha|Smoothie)/.test(m[0]), diantar: false, dikirim: false, sisa: 1 });
+    for (const m of dipilih) pesanan.push({ nama: m[0], harga: m[1], emoji: k.emoji, warna: k.warna, kios: i, minum: /^(Es |Jus|Teh|Kopi|Cappuccino|Coklat Panas|Ocha|Smoothie)/.test(m[0]), diantar: false, dikirim: false, sisa: 1 });
     pesanan = pesanan.slice(-9);
     const ringkas = {}; dipilih.forEach(m => ringkas[m[0]] = (ringkas[m[0]] || 0) + 1);
     hint(`Pesanan dicatat: ${Object.entries(ringkas).map(([n, q]) => q + '× ' + n).join(', ')}. Yuk cari meja!`, 3500);
@@ -1002,30 +1133,125 @@ function bukaKios(i) {
     $('total').textContent = rupiah(tot).replace('Rp0.000', 'Rp0');
   };
 }
-function modelHidangan(p, parent) {
-  const g = new THREE.Group(); parent.add(g);
-  if (p.minum) {
-    mesh(cyl(0.065, 0.055, 0.2, 10), new THREE.MeshLambertMaterial({ color: '#dff2f7', transparent: true, opacity: 0.55 }), 0, 0.1, 0, g, false);
-    p.isi = mesh(cyl(0.058, 0.05, 0.16, 10), p.warna, 0, 0.085, 0, g, false);
-    mesh(cyl(0.008, 0.008, 0.26, 4), '#ffffff', 0.02, 0.2, 0, g, false).rotation.z = 0.2;
+function jenisMenu(n) {
+  if (/Kelapa/.test(n)) return 'kelapa';
+  if (/^Es Krim/.test(n)) return 'eskrim';
+  if (/^(Kopi Hitam|Cappuccino|Coklat Panas|Teh Tarik|Ocha)/.test(n)) return 'cangkir';
+  if (/^(Es |Jus|Smoothie)/.test(n)) return 'gelas';
+  if (/Sate/.test(n)) return 'sate';
+  if (/Bakso|Soto|Rawon|Sop|Mie Ayam|Mie Yamin|Ramen|Tekwan|Model|Bihun|Pangsit Kuah|Capcay/.test(n)) return 'mangkuk';
+  if (/Nasi|Kwetiau|Mie Goreng|Teriyaki|Katsu|Lontong/.test(n)) return 'piring';
+  if (/Ayam/.test(n)) return 'ayam';
+  if (/Siomay|Hakau|Lumpia|Ceker|Bakpao|Mantao/.test(n)) return 'dimsum';
+  if (/Pempek/.test(n)) return 'pempek';
+  if (/Martabak|Roti|Pisang/.test(n)) return 'martabak';
+  if (/Sushi/.test(n)) return 'sushi';
+  if (/Takoyaki/.test(n)) return 'takoyaki';
+  return 'gorengan';
+}
+const WARNA_MENU = { 'Es Kopi Susu': '#b08860', 'Es Teh Manis': '#c8742a', 'Es Teh': '#c8742a', 'Jus Alpukat': '#a9c25a', 'Jus Mangga': '#f2b33c', 'Es Campur': '#e8a0b8', 'Smoothie Stroberi': '#f08aa0', 'Kopi Hitam': '#3a2416', 'Cappuccino': '#c8a27a', 'Coklat Panas': '#5a3420', 'Teh Tarik': '#c9935a', 'Ocha': '#8fb15a' };
+const KET_MENU = {
+  mangkuk: 'Disajikan hangat dalam mangkuk, kuahnya gurih dan harum.', piring: 'Disajikan di piring, masih panas baru diangkat dari wajan.',
+  sate: 'Sate dibakar di atas arang, dengan bumbu yang meresap.', ayam: 'Ayam renyah dengan nasi hangat dan sambal pedas.',
+  dimsum: 'Dikukus dalam keranjang bambu, lembut dan juicy.', pempek: 'Pempek kenyal dengan kuah cuko asam manis pedas.',
+  martabak: 'Dipotong-potong, cocok dimakan berdua.', sushi: 'Nasi pulen digulung rumput laut, cantik dan segar.',
+  takoyaki: 'Bola-bola gurih dengan saus dan taburan katsuobushi.', gorengan: 'Gorengan hangat, renyah di luar.',
+  gelas: 'Minuman dingin yang segar dengan es batu.', cangkir: 'Minuman hangat dalam cangkir, pas untuk bersantai.',
+  eskrim: 'Dua sendok es krim lembut dalam cup.', kelapa: 'Kelapa muda utuh, airnya manis dan segar.'
+};
+function modelMenu(p) {
+  const n = p.nama, j = jenisMenu(n), g = new THREE.Group(), isi = new THREE.Group();
+  const w = WARNA_MENU[n] || p.warna;
+  const piring = (r = 0.17) => mesh(cyl(r, r * 0.75, 0.04, 14), '#f8f4ea', 0, 0.02, 0, g, false);
+  p.minum = ['gelas', 'cangkir', 'kelapa'].includes(j);
+  if (j === 'mangkuk') {
+    mesh(cyl(0.15, 0.09, 0.12, 14), '#f8f4ea', 0, 0.06, 0, g, false);
+    mesh(cyl(0.135, 0.135, 0.02, 14), /Rawon/.test(n) ? '#3a2416' : /Soto|Sop|Tekwan|Model/.test(n) ? '#e8c35a' : '#d9b27a', 0, 0.11, 0, isi, false);
+    if (/Bakso/.test(n)) for (let i = 0; i < 4; i++) mesh(sph(0.035, 7, 5), '#8a6a52', Math.cos(i * 1.6) * 0.07, 0.13, Math.sin(i * 1.6) * 0.07, isi, false);
+    if (/Mie|Ramen|Bihun/.test(n)) for (let i = 0; i < 5; i++) { const m = mesh(new THREE.TorusGeometry(0.05, 0.008, 4, 10), /Bihun/.test(n) ? '#f4efe4' : '#f2d27a', -0.05 + i * 0.025, 0.125, 0.01 * i, isi, false); m.rotation.x = Math.PI / 2; }
+    if (/Ramen/.test(n)) { mesh(sph(0.03, 7, 5), '#f2d14b', 0.05, 0.135, -0.04, isi, false); mesh(box(0.06, 0.005, 0.04), '#d98a6a', -0.05, 0.13, -0.05, isi, false); }
+    if (/Soto|Sop|Rawon/.test(n)) { mesh(box(0.04, 0.02, 0.03), '#f4efe4', 0.04, 0.125, 0.02, isi, false); mesh(sph(0.012, 5, 4), '#5a9a44', -0.04, 0.125, -0.02, isi, false); mesh(sph(0.012, 5, 4), '#5a9a44', -0.02, 0.125, 0.05, isi, false); }
+  } else if (j === 'piring') {
+    piring();
+    const nasi = mesh(sph(0.09, 10, 6, 0), /Kwetiau|Mie/.test(n) ? '#c9935a' : /Nasi Goreng/.test(n) ? '#d9a35a' : '#fbf8f0', 0, 0.04, 0, isi, false); nasi.scale.set(1, 0.55, 1);
+    if (/Nasi Goreng|Mie Goreng/.test(n)) { mesh(cyl(0.05, 0.05, 0.01, 10), '#ffffff', 0.06, 0.1, 0.03, isi, false); mesh(cyl(0.022, 0.022, 0.012, 8), '#f2c12e', 0.06, 0.106, 0.03, isi, false); for (let i = 0; i < 3; i++) mesh(box(0.03, 0.005, 0.015), '#5a9a44', -0.1 + i * 0.03, 0.04, 0.1, isi, false); }
+    if (/Katsu|Teriyaki/.test(n)) { const k = mesh(box(0.14, 0.03, 0.07), /Katsu/.test(n) ? '#c9862a' : '#6a3a1e', 0.03, 0.08, 0.04, isi, false); k.rotation.y = 0.4; mesh(sph(0.04, 6, 4), '#7fbf5a', -0.08, 0.05, 0.07, isi, false); }
+    if (/Lontong/.test(n)) { nasi.visible = false; for (let i = 0; i < 4; i++) mesh(box(0.05, 0.04, 0.05), '#cfe0a8', -0.06 + i * 0.04, 0.04, 0, isi, false); }
+  } else if (j === 'sate') {
+    piring(0.19);
+    for (let i = 0; i < 4; i++) { const st = new THREE.Group(); st.position.set(-0.06 + i * 0.04, 0.05, 0); st.rotation.y = 0.15; isi.add(st); mesh(cyl(0.004, 0.004, 0.28, 4), '#d8c49a', 0, 0, 0, st, false).rotation.x = Math.PI / 2; for (let k = 0; k < 4; k++) mesh(box(0.028, 0.025, 0.028), /Taichan/.test(n) ? '#efe2c8' : '#7a3e1e', 0, 0, -0.06 + k * 0.035, st, false); }
+    mesh(cyl(0.04, 0.03, 0.03, 10), '#4a2a16', 0.1, 0.05, 0.08, isi, false);
+  } else if (j === 'ayam') {
+    piring(0.18);
+    const n2 = mesh(sph(0.07, 10, 6), '#fbf8f0', -0.05, 0.04, 0, isi, false); n2.scale.set(1, 0.6, 1);
+    const ay = mesh(new THREE.DodecahedronGeometry(0.06, 0), /Bakar/.test(n) ? '#7a3e1e' : '#c9862a', 0.06, 0.06, 0.02, isi, false); ay.scale.set(1.3, 0.7, 1);
+    mesh(sph(0.03, 6, 4), '#d63a2a', 0.08, 0.05, -0.08, isi, false);
+    if (/Tahu|Tempe/.test(n)) { n2.visible = false; }
+  } else if (j === 'dimsum') {
+    mesh(cyl(0.14, 0.14, 0.07, 14), '#c9a46a', 0, 0.035, 0, g, false);
+    for (let i = 0; i < 4; i++) { const d = mesh(sph(0.045, 8, 6), /Hakau/.test(n) ? '#f0ece4' : /Ceker/.test(n) ? '#b8642a' : /Bakpao|Mantao/.test(n) ? '#fbf8f0' : '#f2d27a', Math.cos(i * 1.57 + 0.78) * 0.06, 0.09, Math.sin(i * 1.57 + 0.78) * 0.06, isi, false); d.scale.y = 0.8; }
+  } else if (j === 'pempek') {
+    piring(0.18);
+    for (let i = 0; i < 3; i++) { const pp = mesh(sph(0.05, 8, 5), '#e2c08a', -0.07 + i * 0.07, 0.04, 0.02, isi, false); pp.scale.set(1, 0.55, 1.4); }
+    mesh(cyl(0.045, 0.035, 0.05, 10), '#f8f4ea', 0.1, 0.045, -0.09, g, false); mesh(cyl(0.04, 0.04, 0.01, 10), '#3a2416', 0.1, 0.065, -0.09, isi, false);
+  } else if (j === 'martabak') {
+    piring(0.19);
+    for (let i = 0; i < 6; i++) { const s = mesh(box(0.06, 0.035, 0.11), /Telur/.test(n) ? '#d9a04a' : /Pandan/.test(n) ? '#6aa64e' : /Pisang/.test(n) ? '#e8c35a' : '#8a5a2b', (i % 3 - 1) * 0.065, 0.04, (Math.floor(i / 3) - 0.5) * 0.115, isi, false); if (/Coklat/.test(n)) mesh(box(0.062, 0.008, 0.11), '#f2d14b', (i % 3 - 1) * 0.065, 0.06, (Math.floor(i / 3) - 0.5) * 0.115, isi, false); }
+  } else if (j === 'sushi') {
+    mesh(box(0.3, 0.02, 0.14), '#2a2a2a', 0, 0.01, 0, g, false);
+    for (let i = 0; i < 5; i++) { mesh(cyl(0.03, 0.03, 0.035, 10), '#1f3a2a', -0.12 + i * 0.06, 0.04, 0, isi, false); mesh(cyl(0.024, 0.024, 0.037, 10), '#fbf8f0', -0.12 + i * 0.06, 0.04, 0, isi, false); mesh(cyl(0.01, 0.01, 0.038, 6), '#f08a6a', -0.12 + i * 0.06, 0.04, 0, isi, false); }
+  } else if (j === 'takoyaki') {
+    mesh(box(0.2, 0.03, 0.12), '#d8c49a', 0, 0.015, 0, g, false);
+    for (let i = 0; i < 6; i++) { mesh(sph(0.03, 7, 5), '#c9862a', (i % 3 - 1) * 0.06, 0.05, (Math.floor(i / 3) - 0.5) * 0.06, isi, false); }
+  } else if (j === 'gelas') {
+    mesh(cyl(0.06, 0.05, 0.2, 12), new THREE.MeshLambertMaterial({ color: '#dff2f7', transparent: true, opacity: 0.45 }), 0, 0.1, 0, g, false);
+    const cair = mesh(cyl(0.055, 0.046, 0.16, 12), w, 0, 0.08, 0, isi, false);
+    if (/Es Campur/.test(n)) { mesh(sph(0.02, 5, 4), '#6aa64e', 0.02, 0.15, 0, isi, false); mesh(sph(0.02, 5, 4), '#d63a2a', -0.02, 0.15, 0.01, isi, false); }
+    if (/Kopi Susu/.test(n)) mesh(cyl(0.054, 0.054, 0.03, 12), '#efe2c8', 0, 0.17, 0, isi, false);
+    for (let i = 0; i < 2; i++) mesh(box(0.03, 0.03, 0.03), '#e9f6fb', -0.015 + i * 0.03, 0.15, 0, isi, false);
+    mesh(cyl(0.006, 0.006, 0.28, 5), '#ffffff', 0.02, 0.2, 0, g, false).rotation.z = 0.2;
+    isi.position.y = 0; p.cair = cair;
+  } else if (j === 'cangkir') {
+    mesh(cyl(0.09, 0.08, 0.015, 14), '#f8f4ea', 0, 0.008, 0, g, false);
+    mesh(cyl(0.055, 0.045, 0.08, 12), '#f8f4ea', 0, 0.055, 0, g, false);
+    const pg = mesh(new THREE.TorusGeometry(0.025, 0.007, 5, 10), '#f8f4ea', 0.065, 0.06, 0, g, false);
+    mesh(cyl(0.05, 0.05, 0.01, 12), w, 0, 0.09, 0, isi, false);
+    if (/Cappuccino/.test(n)) mesh(cyl(0.04, 0.04, 0.012, 12), '#f4efe4', 0, 0.095, 0, isi, false);
+  } else if (j === 'eskrim') {
+    mesh(cyl(0.06, 0.045, 0.07, 12), '#f08aa0', 0, 0.035, 0, g, false);
+    mesh(sph(0.045, 8, 6), '#fbf3e0', -0.02, 0.09, 0, isi, false); mesh(sph(0.045, 8, 6), '#7a4a2a', 0.025, 0.1, 0.01, isi, false);
+  } else if (j === 'kelapa') {
+    mesh(sph(0.1, 9, 7), '#6aa64e', 0, 0.09, 0, g, false);
+    mesh(cyl(0.045, 0.045, 0.01, 10), '#f4efe4', 0, 0.18, 0, isi, false);
+    mesh(cyl(0.006, 0.006, 0.22, 5), '#f08aa0', 0.02, 0.24, 0, g, false).rotation.z = 0.2;
   } else {
-    mesh(cyl(0.17, 0.12, 0.1, 10), '#f8f4ea', 0, 0.05, 0, g, false);
-    p.isi = mesh(cyl(0.14, 0.14, 0.04, 10), p.warna, 0, 0.1, 0, g, false);
+    piring(0.16);
+    for (let i = 0; i < 4; i++) { const k = mesh(box(0.06, 0.03, 0.05), /Tahu/.test(n) ? '#e2b65a' : '#c9862a', (i % 2 - 0.5) * 0.08, 0.035, (Math.floor(i / 2) - 0.5) * 0.07, isi, false); k.rotation.y = i; }
   }
+  g.add(isi); p.isi = isi; p.jenis = j;
   return g;
 }
+
+function modelHidangan(p, parent) { const g = modelMenu(p); parent.add(g); return g; }
 function taruhMakanan(m) {
-  for (const o of m.makanan) scene.remove(o);
+  for (const o of m.makanan) { scene.remove(o); const ix = interactables.findIndex(x => x.obj === o); if (ix >= 0) interactables.splice(ix, 1); }
   m.makanan = [];
   pesanan.filter(p => p.diantar && p.meja === m).forEach((p, i) => {
     const g = new THREE.Group(); g.position.set(m.x - 0.6 + (i % 3) * 0.6, 0.8, m.z + 0.3 - Math.floor(i / 3) * 0.3); scene.add(g);
     modelHidangan(p, g);
     aturSisa(p);
     m.makanan.push(g);
+    const it = addInteract(g, 'hidangan', p, 0); it.label = 'Lihat ' + p.nama;
   });
   tampilMakan();
 }
-function aturSisa(p) { if (!p.isi) return; p.isi.scale.y = Math.max(0.02, p.sisa); p.isi.visible = p.sisa > 0.02; if (p.minum) p.isi.position.y = 0.005 + 0.08 * p.sisa; }
+function aturSisa(p) {
+  if (!p.isi) return;
+  p.isi.visible = p.sisa > 0.02;
+  if (p.jenis === 'gelas') p.isi.scale.y = Math.max(0.02, p.sisa);
+  else if (p.jenis === 'cangkir' || p.jenis === 'kelapa') p.isi.position.y = -(1 - p.sisa) * 0.06;
+  else p.isi.scale.setScalar(0.35 + 0.65 * p.sisa);
+}
 function tampilMakan() {
   const ada = duduk && duduk.meja && pesanan.some(p => p.diantar && p.meja === duduk.meja && p.sisa > 0.02);
   $('btn-makan').classList.toggle('sembunyi', !ada || !!(duduk && duduk.makanT > 0));
@@ -1152,12 +1378,12 @@ function mulaiFilm(f) {
   setTimeout(() => bicara(pick(['Filmnya kayaknya seru.', 'Kamu mau popcorn?', 'Aku suka nonton bareng kamu.'])), 1500);
   // penonton lain
   const kosong = BIOS.kursi.filter(k => !k.terisi).sort(() => Math.random() - 0.5);
-  const jumlah = Math.min(kosong.length, F.penonton || 22);
+  const jumlah = Math.min(kosong.length, F.penonton != null ? F.penonton : 40);
   for (let i = 0; i < jumlah; i++) {
     const k = kosong[i]; k.terisi = true;
     const N = buatNpc([rand(62, 74), rand(84, 88.5)]); N.speed = rand(1.6, 2);
     N.jalur = [[67.3, 81.5], [67.3, 78], [66.6, k.z + 1.1], [k.x, k.z + 1.1], [k.x, k.z]];
-    N.tunda = i * 0.35; N.kursi = k; N.bioskop = true;
+    N.tunda = i * 0.3; N.kursi = k; N.bioskop = true; N.gedung = 'bios';
     BIOS.penonton.push(N);
   }
 }
@@ -1204,6 +1430,7 @@ function updateGedung(dt, t, dalam) {
       N.P.group.position.set(N.x, 0.52 - N.P.hip + (N.kursi && !N.pergi ? N.kursi.h : 0), N.z);
       for (const l of N.P.legs) l.rotation.x = -1.45;
       if (N.makan) N.P.headParts[0].rotation.x = 0.25 + Math.sin(t * 3 + i) * 0.12;
+      if (N.makanSisa > 0) { N.makanSisa -= dt; if (N.makanSisa <= 0) { N.duduk = false; N.makan = false; N.P.headParts[0].rotation.x = 0; if (N.kursiFC) N.kursiFC.n = null; N.jalur = [[N.x, N.z - 1.3], [FC_PINTU[0], N.z - 1.3 > 76 ? 76 : N.z - 1.3], FC_PINTU, [rand(40, 85), 88]]; N.pergi = true; } }
     } else {
       if (!N.jalur.length && N.keliling) { const b = N.keliling; N.jalur = [[rand(b.x1 + 4, b.x2 - 4), rand(b.z1 + 4, b.z2 - 3)]]; N.diamT = rand(1, 4); }
       if (!N.jalur.length && N.jalan) rencanaJalan(N);
@@ -1228,7 +1455,7 @@ function updateGedung(dt, t, dalam) {
         }
       }
       N.phase += moving ? dt * N.speed * 2.6 : 0;
-      N.P.group.position.set(N.x, N.kursi && N.jalur.length <= 2 && !N.pergi ? N.kursi.h : (N.pergi && N.jalur.length >= 4 ? N.kursi.h : 0), N.z);
+      N.P.group.position.set(N.x, N.kursi && N.jalur.length <= 2 && !N.pergi ? N.kursi.h : (N.pergi && N.kursi && N.jalur.length >= 4 ? N.kursi.h : 0), N.z);
       animPerson(N.P, N.phase, moving ? 0.8 : 0);
       if (N.bawa) { swingArm(N.P.arms[0], -1.25, 1); swingArm(N.P.arms[1], -1.25, -1); }
       else { swingArm(N.P.arms[0], -Math.sin(N.phase) * 0.4 * (moving ? 1 : 0), 1); swingArm(N.P.arms[1], Math.sin(N.phase) * 0.4 * (moving ? 1 : 0), -1); }
@@ -1240,7 +1467,7 @@ function updateGedung(dt, t, dalam) {
   if (cullT <= 0) {
     cullT = 0.4;
     for (const A of animals) A.group.visible = Math.hypot(A.group.position.x - player.x, A.group.position.z - player.z) < 120;
-    for (const N of npcs) if (!N.local) N.vis = Math.hypot(N.x - player.x, N.z - player.z) < 60;
+    for (const N of npcs) if (!N.local) N.vis = N.gedung ? Math.hypot((N.gedung === 'fc' ? 50 : 75) - player.x, (N.gedung === 'fc' ? 72 : 74) - player.z) < 38 : Math.hypot(N.x - player.x, N.z - player.z) < 60;
   }
 }
 
@@ -1424,9 +1651,10 @@ function openInter(it) {
   let info, key;
   if (it.kind === 'hewan') { key = it.data; info = INFO[key]; }
   else if (it.kind === 'papan') { key = SPES_ZONA[it.data]; info = INFO[key]; if (!info) return; if (it.data === 'babyzoo') info = { nama: 'Kebun Binatang Mini', emoji: '🐰🐐', fakta: [...INFO.kelinci.fakta, ...INFO.kambing.fakta], makan: true }; }
-  else if (it.kind === 'kios') { bukaKios(it.data); return; }
-  else if (it.kind === 'meja') { dudukMeja(it.data); return; }
-  else if (it.kind === 'bioskop') { bukaFilm(); return; }
+  else if (it.kind === 'kios') { if (antriPemain) { hint('Kalian sedang antre.'); return; } if (!masukAntrian(KIOS[it.data].antrian)) bukaKios(it.data); return; }
+  else if (it.kind === 'meja') { if (it.data.penuh) { hint('Meja ini penuh. Cari meja lain yang kosong ya.'); return; } dudukMeja(it.data); return; }
+  else if (it.kind === 'bioskop') { if (antriPemain) { hint('Kalian sedang antre.'); return; } if (it.obj === BIOS.layar || !masukAntrian(BIOS.antrian)) bukaFilm(); return; }
+  else if (it.kind === 'hidangan') { lihatHidangan(it.data); return; }
   else { info = LANDMARK[it.data]; }
   if (!info) return;
   paused = true;
@@ -1439,7 +1667,7 @@ function openInter(it) {
   } else { btn.classList.add('sembunyi'); kartuAksi = null; }
   $('kartu').classList.remove('sembunyi');
 }
-function tutupKartu() { $('kartu').classList.add('sembunyi'); paused = false; }
+function tutupKartu() { $('kartu').classList.add('sembunyi'); paused = false; if (antriPemain && antriPemain.dilayani) keluarAntrian(); }
 $('k-tutup').onclick = tutupKartu;
 $('k-aksi').onclick = () => { const f = kartuAksi; tutupKartu(); if (f) f(); };
 
@@ -1605,7 +1833,7 @@ function update(dt, t) {
   if (keys.KeyW || keys.ArrowUp) jy = 1; if (keys.KeyS || keys.ArrowDown) jy = -1;
   if (keys.KeyA || keys.ArrowLeft) jx = -1; if (keys.KeyD || keys.ArrowRight) jx = 1;
   let mag = Math.min(1, Math.hypot(jx, jy));
-  if (paused || !started || duduk) { jx = jy = 0; mag = 0; }
+  if (paused || !started || duduk || antriPemain) { jx = jy = 0; mag = 0; }
   const fwdX = -Math.sin(camYaw), fwdZ = -Math.cos(camYaw), rtX = Math.cos(camYaw), rtZ = -Math.sin(camYaw);
   let mx = fwdX * jy + rtX * jx, mz = fwdZ * jy + rtZ * jx; const ml = Math.hypot(mx, mz);
   const run = keys.ShiftLeft || keys.ShiftRight;
@@ -1616,12 +1844,14 @@ function update(dt, t) {
     const p = { x: player.x, z: player.z }; resolve(p, 0.38); player.x = p.x; player.z = p.z;
     tabrakNpc(mx, mz);
   }
-  player.speed = lerp(player.speed, spd, Math.min(1, dt * 8));
+  const spdAntri = antriPemain ? gerakAntri(dt) : 0;
+  player.speed = lerp(player.speed, Math.max(spd, spdAntri), Math.min(1, dt * 8));
   const targetT = mode === 'tpp' ? 1 : 0;
   modeT += clamp(targetT - modeT, -dt * 1.6, dt * 1.6);
   const e = ease(modeT);
   // arah badan
-  if (modeT < 0.5 || mode === 'fpp') player.yaw += angDiff(player.yaw, camYaw) * Math.min(1, dt * 10);
+  if (antriPemain) {}
+  else if (modeT < 0.5 || mode === 'fpp') player.yaw += angDiff(player.yaw, camYaw) * Math.min(1, dt * 10);
   else if (ml > 0.01) player.yaw += angDiff(player.yaw, Math.atan2(-mx, -mz)) * Math.min(1, dt * 7);
   player.phase += player.speed * dt * 2.6;
 
@@ -1681,7 +1911,7 @@ function update(dt, t) {
 
   // hewan
   for (const A of animals) if (A.group.visible) updateAnimal(A, dt, t);
-  updateGedung(dt, t, dalam); updateTegur(dt);
+  updateGedung(dt, t, dalam); updateAntrian(dt); updateTegur(dt);
   // jip
   {
     const ahead = kurvaSafari.getPointAt((jip.u + 0.006) % 1);
@@ -1713,7 +1943,7 @@ function update(dt, t) {
     const d = Math.hypot(tmpA.x - player.x, tmpA.z - player.z);
     if (d < it.radius && d < nd) { nd = d; nearest = it; }
   }
-  if (nearest && started && !paused && !duduk) {
+  if (nearest && started && !paused && !duduk && !antriPemain) {
     const nm = nearest.label ? '' : nearest.kind === 'hewan' ? INFO[nearest.data].nama : nearest.kind === 'papan' ? (nearest.data === 'peta' ? 'Peta' : (ZONES.find(z => z.id === nearest.data) || {}).nama) : LANDMARK[nearest.data].nama;
     ui.aksi.textContent = nearest.label || ('Lihat ' + nm); ui.aksi.classList.remove('sembunyi');
   } else ui.aksi.classList.add('sembunyi');
@@ -1806,4 +2036,4 @@ function frame() {
 // intro: kamera memutar perlahan di layar mulai
 camYaw = 0;
 frame();
-window.__safari = { player, npcs, BIOS, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { player, npcs, BIOS, ANTRIAN, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
