@@ -50,7 +50,8 @@ progress{width:100%;height:10px}
 
   <div id="isi" class="sembunyi">
     <div class="kartu">
-      <h2 style="margin:0">Daftar film</h2>
+      <h2 style="margin:0">Daftar film (3 pilihan)</h2>
+      <p class="kecil" id="info-maks"></p>
       <div id="daftar"></div>
       <label for="penonton">Jumlah penonton lain di bioskop</label>
       <input id="penonton" type="number" min="0" max="60" value="40">
@@ -65,7 +66,7 @@ progress{width:100%;height:10px}
       <textarea id="f-sinopsis" maxlength="300"></textarea>
       <label>Poster (opsional)</label>
       <input id="f-poster" type="file" accept="image/*">
-      <label>Sumber film</label>
+      <label>Sumber film <small>(boleh dikosongkan dulu, judul tetap muncul di loket)</small></label>
       <div class="pilihan">
         <label><input type="radio" name="sumber" value="file" checked> Upload video</label>
         <label><input type="radio" name="sumber" value="link"> Link video .mp4</label>
@@ -131,6 +132,9 @@ async function muat() {
 }
 function tampil() {
   const d = $('daftar');
+  const penuh = data.daftar.length >= 3;
+  $('tambah').disabled = penuh && editIdx < 0;
+  $('info-maks').textContent = `${data.daftar.length} dari 3 film. ` + (penuh ? 'Untuk mengganti, edit atau hapus salah satu film.' : 'Kamu bisa menambah ' + (3 - data.daftar.length) + ' film lagi.');
   if (!data.daftar.length) { d.innerHTML = '<p class="kecil">Belum ada film.</p>'; return; }
   d.innerHTML = data.daftar.map((f, i) => `<div class="film">${f.poster ? `<img src="../${esc(f.poster)}" alt="">` : '<div class="kosong">🎬</div>'}
     <div class="isi"><b>${esc(f.judul)}</b><span>${esc(f.sinopsis)}</span><br><span>${f.youtube ? 'YouTube: ' + esc(f.youtube) : esc(f.video)}</span>
@@ -144,7 +148,7 @@ async function simpanData(pesan) {
 $('daftar').onclick = async (e) => {
   const t = e.target;
   if (t.dataset.edit != null) {
-    editIdx = +t.dataset.edit; const f = data.daftar[editIdx];
+    editIdx = +t.dataset.edit; const f = data.daftar[editIdx]; $('tambah').disabled = false;
     $('judul-form').textContent = 'Edit film'; $('batal').classList.remove('sembunyi');
     $('f-judul').value = f.judul; $('f-sinopsis').value = f.sinopsis || '';
     const s = f.youtube ? 'youtube' : (f.video && !f.video.startsWith('film/') ? 'link' : 'file');
@@ -169,12 +173,13 @@ function gantiSumber() {
   for (const k of ['file', 'link', 'youtube']) $('s-' + k).classList.toggle('sembunyi', k !== v);
 }
 document.querySelectorAll('input[name=sumber]').forEach(r => r.onchange = gantiSumber);
-function resetForm() { editIdx = -1; $('judul-form').textContent = 'Tambah film'; $('batal').classList.add('sembunyi'); for (const id of ['f-judul', 'f-sinopsis', 'f-link', 'f-youtube', 'f-poster', 'f-video']) $(id).value = ''; }
+function resetForm() { editIdx = -1; setTimeout(tampil, 0); $('judul-form').textContent = 'Tambah film'; $('batal').classList.add('sembunyi'); for (const id of ['f-judul', 'f-sinopsis', 'f-link', 'f-youtube', 'f-poster', 'f-video']) $(id).value = ''; }
 $('batal').onclick = resetForm;
 
 $('tambah').onclick = async () => {
   const judul = $('f-judul').value.trim();
   if (!judul) { status('Judul belum diisi.'); return; }
+  if (editIdx < 0 && data.daftar.length >= 3) { status('Sudah ada 3 film. Edit atau hapus salah satu dulu.', 5000); return; }
   const lama = editIdx >= 0 ? data.daftar[editIdx] : {};
   const f = { judul, sinopsis: $('f-sinopsis').value.trim(), poster: lama.poster || '', video: '', youtube: '' };
   const sumber = document.querySelector('input[name=sumber]:checked').value;
@@ -198,7 +203,6 @@ $('tambah').onclick = async () => {
         await tulis(f.video, await fileB64(file), 'Upload film ' + judul);
         if (lama.video && lama.video.startsWith('film/') && lama.video !== f.video) await hapusFile(lama.video).catch(() => {});
       } else if (lama.video && !lama.youtube) f.video = lama.video;
-      else throw new Error('Pilih file video dulu.');
     }
     const pf = $('f-poster').files[0];
     if (pf) {

@@ -8,6 +8,16 @@ window.SAFARI = {
   // Obrolan AI: berapa pesan terakhir yang dikirim ke AI berikutnya (hemat kuota)
   riwayatAI: 3,
 
+  // Waktu: jam saat mulai (0-23) dan berapa menit nyata untuk 1 jam di game
+  jamMulai: 9,
+  menitPerJam: 1,
+
+  // Topi saat siang terik
+  tanyaTopi: 'Kamu pasti merasa panas kan? Ingin mengenakan topi?',
+  saatPasangTopi: ['Sini, aku pakaikan. Biar kamu nggak kepanasan.'],
+  setelahPakaiTopi: ['Nah, cantik. Sekarang nggak kepanasan lagi.'],
+  jawabTidakTopi: ['Oke, bilang aja ya kalau kepanasan.'],
+
   // Warna baju (boleh diganti kode warna lain)
   bajuKamu: '#e8836f',
   bajuPasangan: '#4f7d6b',

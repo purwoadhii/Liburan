@@ -84,3 +84,4 @@ h2{margin:4px 0 8px;color:var(--hijau)}
 .total{text-align:right;margin:4px 2px 0;font-size:15px}
 #pratinjau{width:100%;height:auto;border-radius:14px;background:radial-gradient(circle,#fffaf0,#e9dcc0);display:block}
 .ket-hidangan{margin:8px 0;font-size:15px}
+#jam{position:absolute;left:max(12px,env(safe-area-inset-left));top:calc(max(12px,env(safe-area-inset-top)) + 44px);background:var(--kaca);padding:5px 12px;border-radius:999px;box-shadow:var(--bayang);font-size:14px;font-weight:500;pointer-events:auto;cursor:pointer}
