@@ -1600,7 +1600,7 @@ function posisiDuduk() {
 /* ---------- film ---------- */
 function ytId(u) { const m = String(u || '').match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : null; }
 function bukaFilm() {
-  const daftar = (F.daftar || []).filter(f => f.judul).slice(0, 3);
+  const daftar = (F.daftar || []).filter(f => f && f.judul).slice(0, 3);
   const hT = D.tiketBioskop != null ? D.tiketBioskop : 20000, hP = D.hargaPopcorn != null ? D.hargaPopcorn : 25000, hM = D.hargaMinumBioskop != null ? D.hargaMinumBioskop : 15000;
   const film = daftar.length ? '<div class="menu">' + daftar.map((f, i) => `<label class="menu-item film"><input type="radio" name="film" value="${i}" ${i === 0 ? 'checked' : ''}>${f.poster ? `<img src="${f.poster}" alt="">` : '<span class="poster-kosong">🎬</span>'}<span><b>${f.judul}</b><small>${f.sinopsis || ''}</small></span></label>`).join('') + '</div>' : '<p>Belum ada film yang diputar. Film bisa ditambahkan lewat halaman admin.</p>';
   const baris = (id, nama, h) => `<div class="menu-item" data-id="${id}" data-h="${h}"><span>${nama}<small>${fmtRp(h)}</small></span><button class="qty" data-d="-1">−</button><b class="jml">0</b><button class="qty" data-d="1">+</button></div>`;

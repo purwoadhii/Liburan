@@ -49,34 +49,13 @@ progress{width:100%;height:10px}
   </div>
 
   <div id="isi" class="sembunyi">
+    <p class="kecil">Ada 3 tempat film. Isi judulnya, lalu tekan <b>Simpan film</b> di masing-masing kotak. Video dan poster boleh menyusul.</p>
+    <div id="slot"></div>
     <div class="kartu">
-      <h2 style="margin:0">Daftar film (3 pilihan)</h2>
-      <p class="kecil" id="info-maks"></p>
-      <div id="daftar"></div>
+      <h2 style="margin:0">Pengaturan</h2>
       <label for="penonton">Jumlah penonton lain di bioskop</label>
       <input id="penonton" type="number" min="0" max="60" value="24">
       <div class="baris"><button class="utama" id="simpan-pengaturan">Simpan</button></div>
-    </div>
-
-    <div class="kartu">
-      <h2 style="margin:0" id="judul-form">Tambah film</h2>
-      <label for="f-judul">Judul</label>
-      <input id="f-judul" maxlength="80">
-      <label for="f-sinopsis">Sinopsis singkat</label>
-      <textarea id="f-sinopsis" maxlength="300"></textarea>
-      <label>Poster (opsional)</label>
-      <input id="f-poster" type="file" accept="image/*">
-      <label>Sumber film <small>(boleh dikosongkan dulu, judul tetap muncul di loket)</small></label>
-      <div class="pilihan">
-        <label><input type="radio" name="sumber" value="file" checked> Upload video</label>
-        <label><input type="radio" name="sumber" value="link"> Link video .mp4</label>
-        <label><input type="radio" name="sumber" value="youtube"> Link YouTube</label>
-      </div>
-      <div id="s-file"><input id="f-video" type="file" accept="video/mp4,video/webm" style="margin-top:8px"><small>Format MP4 (H.264) paling aman untuk HP. Maksimal sekitar 90 MB; video lebih besar sebaiknya dikompres dulu atau pakai link YouTube.</small></div>
-      <div id="s-link" class="sembunyi"><input id="f-link" placeholder="https://.../film.mp4" style="margin-top:8px"><small>Link harus langsung ke file video dan servernya mengizinkan diputar dari situs lain.</small></div>
-      <div id="s-youtube" class="sembunyi"><input id="f-youtube" placeholder="https://youtu.be/..." style="margin-top:8px"><small>Film YouTube diputar di layar penuh di atas bioskop, bukan di layar 3D.</small></div>
-      <progress id="progres" class="sembunyi" max="100" value="0"></progress>
-      <div class="baris"><button class="utama" id="tambah">Simpan film</button><button id="batal" class="sembunyi">Batal edit</button></div>
     </div>
   </div>
 </main>
@@ -130,95 +109,101 @@ async function muat() {
   $('penonton').value = data.penonton != null ? data.penonton : 24;
   tampil();
 }
+function slotHtml(i) {
+  return `<div class="kartu" data-slot="${i}">
+    <div class="film" style="padding-top:0"><div class="kosong" id="pv-${i}">🎬</div><div class="isi"><h2 style="margin:0">Film ${i + 1}</h2><span id="ket-${i}">Belum diisi</span></div></div>
+    <label>Judul</label><input id="judul-${i}" maxlength="80" placeholder="Judul film ${i + 1}">
+    <label>Sinopsis singkat</label><textarea id="sinopsis-${i}" maxlength="300"></textarea>
+    <label>Poster (opsional)</label><input id="poster-${i}" type="file" accept="image/*">
+    <label>Sumber film <small>(boleh dikosongkan dulu, judul tetap muncul di loket)</small></label>
+    <div class="pilihan">
+      <label><input type="radio" name="sumber-${i}" value="file" checked> Upload video</label>
+      <label><input type="radio" name="sumber-${i}" value="link"> Link video .mp4</label>
+      <label><input type="radio" name="sumber-${i}" value="youtube"> Link YouTube</label>
+    </div>
+    <div id="s-file-${i}"><input id="video-${i}" type="file" accept="video/mp4,video/webm" style="margin-top:8px"><small>MP4 (H.264) paling aman untuk HP, maksimal sekitar 90 MB.</small></div>
+    <div id="s-link-${i}" class="sembunyi"><input id="link-${i}" placeholder="https://.../film.mp4" style="margin-top:8px"></div>
+    <div id="s-youtube-${i}" class="sembunyi"><input id="yt-${i}" placeholder="https://youtu.be/..." style="margin-top:8px"><small>Diputar layar penuh di atas bioskop.</small></div>
+    <progress id="progres-${i}" class="sembunyi"></progress>
+    <div class="baris"><button class="utama" id="simpan-${i}">Simpan film ${i + 1}</button><button class="hapus" id="hapus-${i}">Kosongkan</button></div>
+  </div>`;
+}
+$('slot').innerHTML = [0, 1, 2].map(slotHtml).join('');
+const sumberDari = i => document.querySelector(`input[name=sumber-${i}]:checked`).value;
+function gantiSumber(i) { const v = sumberDari(i); for (const k of ['file', 'link', 'youtube']) $(`s-${k}-${i}`).classList.toggle('sembunyi', k !== v); }
 function tampil() {
-  const d = $('daftar');
-  const penuh = data.daftar.length >= 3;
-  $('tambah').disabled = penuh && editIdx < 0;
-  $('info-maks').textContent = `${data.daftar.length} dari 3 film. ` + (penuh ? 'Untuk mengganti, edit atau hapus salah satu film.' : 'Kamu bisa menambah ' + (3 - data.daftar.length) + ' film lagi.');
-  if (!data.daftar.length) { d.innerHTML = '<p class="kecil">Belum ada film.</p>'; return; }
-  d.innerHTML = data.daftar.map((f, i) => `<div class="film">${f.poster ? `<img src="../${esc(f.poster)}" alt="">` : '<div class="kosong">🎬</div>'}
-    <div class="isi"><b>${esc(f.judul)}</b><span>${esc(f.sinopsis)}</span><br><span>${f.youtube ? 'YouTube: ' + esc(f.youtube) : esc(f.video)}</span>
-    <div class="baris"><button data-edit="${i}">Edit</button><button data-naik="${i}" ${i ? '' : 'disabled'}>↑</button><button class="hapus" data-hapus="${i}">Hapus</button></div></div></div>`).join('');
+  while (data.daftar.length < 3) data.daftar.push({ judul: '' });
+  data.daftar = data.daftar.slice(0, 3);
+  data.daftar.forEach((f, i) => {
+    $('judul-' + i).value = f.judul || ''; $('sinopsis-' + i).value = f.sinopsis || '';
+    const s = f.youtube ? 'youtube' : (f.video && !f.video.startsWith('film/') ? 'link' : 'file');
+    document.querySelector(`input[name=sumber-${i}][value=${s}]`).checked = true; gantiSumber(i);
+    $('link-' + i).value = s === 'link' ? f.video : ''; $('yt-' + i).value = f.youtube || '';
+    $('poster-' + i).value = ''; $('video-' + i).value = '';
+    $('pv-' + i).outerHTML = f.poster ? `<img id="pv-${i}" src="../${esc(f.poster)}?t=${Date.now()}" alt="">` : `<div class="kosong" id="pv-${i}">🎬</div>`;
+    $('ket-' + i).textContent = !f.judul ? 'Belum diisi' : f.youtube ? 'YouTube' : f.video ? (f.video.startsWith('film/') ? 'Video sudah diunggah' : 'Link video') : 'Judul saja (belum ada video)';
+  });
 }
 async function simpanData(pesan) {
   const teks = '// Daftar film bioskop. Diisi lewat halaman admin (/admin/).\nwindow.FILM = ' + JSON.stringify(data, null, 2) + ';\n';
   await tulis('film.js', b64utf8(teks), pesan);
 }
-
-$('daftar').onclick = async (e) => {
-  const t = e.target;
-  if (t.dataset.edit != null) {
-    editIdx = +t.dataset.edit; const f = data.daftar[editIdx]; $('tambah').disabled = false;
-    $('judul-form').textContent = 'Edit film'; $('batal').classList.remove('sembunyi');
-    $('f-judul').value = f.judul; $('f-sinopsis').value = f.sinopsis || '';
-    const s = f.youtube ? 'youtube' : (f.video && !f.video.startsWith('film/') ? 'link' : 'file');
-    document.querySelector(`input[name=sumber][value=${s}]`).checked = true; gantiSumber();
-    $('f-link').value = s === 'link' ? f.video : ''; $('f-youtube').value = f.youtube || '';
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-  }
-  if (t.dataset.naik != null) { const i = +t.dataset.naik; [data.daftar[i - 1], data.daftar[i]] = [data.daftar[i], data.daftar[i - 1]]; tampil(); try { await simpanData('Ubah urutan film'); status('Urutan disimpan.'); } catch (er) { status('Gagal: ' + er.message, 6000); } }
-  if (t.dataset.hapus != null) {
-    const i = +t.dataset.hapus, f = data.daftar[i];
-    if (!confirm('Hapus film "' + f.judul + '"?')) return;
-    t.disabled = true; status('Menghapus…', 0);
-    try {
-      data.daftar.splice(i, 1); await simpanData('Hapus film ' + f.judul);
-      for (const p of [f.video, f.poster]) if (p && p.startsWith('film/')) await hapusFile(p).catch(() => {});
-      tampil(); status('Film dihapus.');
-    } catch (er) { status('Gagal: ' + er.message, 6000); }
-  }
-};
-function gantiSumber() {
-  const v = document.querySelector('input[name=sumber]:checked').value;
-  for (const k of ['file', 'link', 'youtube']) $('s-' + k).classList.toggle('sembunyi', k !== v);
-}
-document.querySelectorAll('input[name=sumber]').forEach(r => r.onchange = gantiSumber);
-function resetForm() { editIdx = -1; setTimeout(tampil, 0); $('judul-form').textContent = 'Tambah film'; $('batal').classList.add('sembunyi'); for (const id of ['f-judul', 'f-sinopsis', 'f-link', 'f-youtube', 'f-poster', 'f-video']) $(id).value = ''; }
-$('batal').onclick = resetForm;
-
-$('tambah').onclick = async () => {
-  const judul = $('f-judul').value.trim();
-  if (!judul) { status('Judul belum diisi.'); return; }
-  if (editIdx < 0 && data.daftar.length >= 3) { status('Sudah ada 3 film. Edit atau hapus salah satu dulu.', 5000); return; }
-  const lama = editIdx >= 0 ? data.daftar[editIdx] : {};
-  const f = { judul, sinopsis: $('f-sinopsis').value.trim(), poster: lama.poster || '', video: '', youtube: '' };
-  const sumber = document.querySelector('input[name=sumber]:checked').value;
-  const id = slug(judul) + '-' + Date.now().toString(36);
-  const btn = $('tambah'); btn.disabled = true;
+async function simpanSlot(i) {
+  const judul = $('judul-' + i).value.trim();
+  if (!judul) { status('Judul film ' + (i + 1) + ' belum diisi.'); return; }
+  const lama = data.daftar[i] || {};
+  const f = { judul, sinopsis: $('sinopsis-' + i).value.trim(), poster: lama.poster || '', video: '', youtube: '' };
+  const sumber = sumberDari(i), id = slug(judul) + '-' + Date.now().toString(36);
+  const btn = $('simpan-' + i); btn.disabled = true;
   try {
     if (sumber === 'youtube') {
-      f.youtube = $('f-youtube').value.trim();
-      if (!/(youtu\.be\/|v=|embed\/|shorts\/)[\w-]{11}/.test(f.youtube)) throw new Error('Link YouTube tidak dikenali.');
+      f.youtube = $('yt-' + i).value.trim();
+      if (f.youtube && !/(youtu\.be\/|v=|embed\/|shorts\/)[\w-]{11}/.test(f.youtube)) throw new Error('Link YouTube tidak dikenali.');
     } else if (sumber === 'link') {
-      f.video = $('f-link').value.trim();
-      if (!/^https?:\/\//.test(f.video)) throw new Error('Link video belum benar.');
+      f.video = $('link-' + i).value.trim();
+      if (f.video && !/^https?:\/\//.test(f.video)) throw new Error('Link video belum benar.');
     } else {
-      const file = $('f-video').files[0];
+      const file = $('video-' + i).files[0];
       if (file) {
         if (file.size > 90 * 1024 * 1024) throw new Error('Video lebih dari 90 MB. Kompres dulu atau pakai link YouTube.');
         status('Mengunggah video… jangan tutup halaman ini.', 0);
-        $('progres').classList.remove('sembunyi'); $('progres').removeAttribute('value');
+        $('progres-' + i).classList.remove('sembunyi');
         const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
         f.video = 'film/' + id + '.' + ext;
         await tulis(f.video, await fileB64(file), 'Upload film ' + judul);
         if (lama.video && lama.video.startsWith('film/') && lama.video !== f.video) await hapusFile(lama.video).catch(() => {});
-      } else if (lama.video && !lama.youtube) f.video = lama.video;
+      } else if (lama.video && lama.video.startsWith('film/')) f.video = lama.video;
     }
-    const pf = $('f-poster').files[0];
+    const pf = $('poster-' + i).files[0];
     if (pf) {
       status('Mengunggah poster…', 0);
       f.poster = 'film/' + id + '-poster.jpg';
       await tulis(f.poster, await posterB64(pf), 'Poster ' + judul);
       if (lama.poster && lama.poster !== f.poster) await hapusFile(lama.poster).catch(() => {});
     }
-    if (editIdx >= 0) data.daftar[editIdx] = f; else data.daftar.push(f);
+    data.daftar[i] = f;
     status('Menyimpan daftar film…', 0);
-    await simpanData((editIdx >= 0 ? 'Ubah film ' : 'Tambah film ') + judul);
-    resetForm(); tampil();
-    status('Tersimpan! Film muncul di game dalam 1–2 menit.', 4000);
+    await simpanData('Film ' + (i + 1) + ': ' + judul);
+    tampil();
+    status('Film ' + (i + 1) + ' tersimpan! Muncul di game dalam 1–2 menit.', 4000);
   } catch (er) { status('Gagal: ' + er.message, 7000); }
-  $('progres').classList.add('sembunyi'); btn.disabled = false;
-};
+  $('progres-' + i).classList.add('sembunyi'); btn.disabled = false;
+}
+async function kosongkan(i) {
+  const f = data.daftar[i]; if (!f || !f.judul) { tampil(); return; }
+  if (!confirm('Kosongkan film ' + (i + 1) + ' "' + f.judul + '"?')) return;
+  status('Menghapus…', 0);
+  try {
+    data.daftar[i] = { judul: '' }; await simpanData('Kosongkan film ' + (i + 1));
+    for (const p of [f.video, f.poster]) if (p && p.startsWith('film/')) await hapusFile(p).catch(() => {});
+    tampil(); status('Film ' + (i + 1) + ' dikosongkan.');
+  } catch (er) { status('Gagal: ' + er.message, 6000); }
+}
+[0, 1, 2].forEach(i => {
+  document.querySelectorAll(`input[name=sumber-${i}]`).forEach(r => r.onchange = () => gantiSumber(i));
+  $('simpan-' + i).onclick = () => simpanSlot(i);
+  $('hapus-' + i).onclick = () => kosongkan(i);
+});
 $('simpan-pengaturan').onclick = async () => {
   data.penonton = Math.max(0, Math.min(60, +$('penonton').value || 0));
   try { await simpanData('Ubah jumlah penonton'); status('Tersimpan.'); } catch (er) { status('Gagal: ' + er.message, 6000); }
