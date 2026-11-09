@@ -190,6 +190,7 @@ const mMacan = new THREE.MeshLambertMaterial({ map: tMacan });
 /* ------------------------------------------------------------------ roads */
 const roadPts = []; // {x,z,w}
 const mapRoads = []; // for map drawing {pts,w,color}
+const jalurJalan = []; // sampel tiap jalan, untuk pengunjung
 function ribbon(points, width, y, material, closed = false, mapColor) {
   const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p[0], 0, p[1])), closed, 'catmullrom', 0.5);
   const n = Math.max(2, Math.ceil(curve.getLength() / 1.5));
@@ -209,6 +210,7 @@ function ribbon(points, width, y, material, closed = false, mapColor) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
   const m = new THREE.Mesh(g, material); m.receiveShadow = true; scene.add(m);
+  if (mapColor && material !== mAspal) jalurJalan.push({ pts: samp, w: width, closed });
   if (mapColor) mapRoads.push({ pts: samp, w: width, color: mapColor });
   return curve;
 }
@@ -867,18 +869,18 @@ ribbon([[30, 80], [36, 83], [40, 84]], 3.6, 0.045, mPaving, false, '#e6d3a8');
 
 /* ---------- food court ---------- */
 const KIOS = [
-  { nama: 'Nasi Goreng', emoji: '🍳', warna: '#e8836f', menu: [['Nasi Goreng Spesial', 28], ['Nasi Goreng Seafood', 32], ['Kwetiau Goreng', 27]] },
-  { nama: 'Bakso', emoji: '🍜', warna: '#c95b5b', menu: [['Bakso Urat', 25], ['Bakso Beranak', 35], ['Mie Bakso', 27]] },
-  { nama: 'Sate', emoji: '🍢', warna: '#f29b4b', menu: [['Sate Ayam (10 tusuk)', 30], ['Sate Kambing', 40], ['Lontong', 6]] },
-  { nama: 'Mie Ayam', emoji: '🍜', warna: '#f2d14b', menu: [['Mie Ayam', 22], ['Mie Ayam Jamur', 25], ['Pangsit Goreng', 10]] },
-  { nama: 'Soto', emoji: '🥣', warna: '#e3b23c', menu: [['Soto Ayam', 24], ['Soto Betawi', 32], ['Nasi Putih', 6]] },
-  { nama: 'Ayam Geprek', emoji: '🍗', warna: '#d64545', menu: [['Ayam Geprek Sambal Bawang', 25], ['Ayam Geprek Keju', 30], ['Tahu Tempe', 8]] },
-  { nama: 'Dimsum', emoji: '🥟', warna: '#6aa64e', menu: [['Siomay Ayam', 20], ['Hakau Udang', 24], ['Bakpao Coklat', 15]] },
-  { nama: 'Pempek', emoji: '🐟', warna: '#5aa7dc', menu: [['Pempek Kapal Selam', 22], ['Pempek Lenjer', 18], ['Tekwan', 20]] },
-  { nama: 'Martabak', emoji: '🥞', warna: '#a0522d', menu: [['Martabak Manis Coklat Keju', 35], ['Martabak Telur', 32], ['Terang Bulan Mini', 15]] },
-  { nama: 'Masakan Jepang', emoji: '🍣', warna: '#d98ad6', menu: [['Ramen', 38], ['Sushi Roll', 35], ['Chicken Katsu', 33]] },
-  { nama: 'Kopi & Teh', emoji: '☕', warna: '#7a5634', menu: [['Es Kopi Susu', 20], ['Teh Tarik', 15], ['Es Teh Manis', 8]] },
-  { nama: 'Es Krim & Jus', emoji: '🍦', warna: '#2f7f7a', menu: [['Es Krim 2 Rasa', 18], ['Jus Alpukat', 20], ['Es Campur', 18]] }
+  { nama: 'Nasi Goreng', emoji: '🍳', warna: '#e8836f', menu: [['Nasi Goreng Spesial', 28], ['Nasi Goreng Seafood', 32], ['Nasi Goreng Kambing', 35], ['Kwetiau Goreng', 27], ['Mie Goreng Jawa', 25], ['Capcay Kuah', 26]] },
+  { nama: 'Bakso', emoji: '🍜', warna: '#c95b5b', menu: [['Bakso Urat', 25], ['Bakso Beranak', 35], ['Bakso Mercon', 28], ['Mie Bakso', 27], ['Bihun Bakso', 25], ['Bakso Goreng', 15]] },
+  { nama: 'Sate', emoji: '🍢', warna: '#f29b4b', menu: [['Sate Ayam (10 tusuk)', 30], ['Sate Kambing', 40], ['Sate Taichan', 28], ['Sate Padang', 32], ['Lontong', 6], ['Nasi Putih', 6]] },
+  { nama: 'Mie Ayam', emoji: '🍜', warna: '#f2d14b', menu: [['Mie Ayam', 22], ['Mie Ayam Jamur', 25], ['Mie Ayam Bakso', 28], ['Mie Yamin', 24], ['Pangsit Goreng', 10], ['Pangsit Kuah', 12]] },
+  { nama: 'Soto', emoji: '🥣', warna: '#e3b23c', menu: [['Soto Ayam', 24], ['Soto Betawi', 32], ['Soto Lamongan', 26], ['Rawon', 30], ['Sop Buntut', 45], ['Nasi Putih', 6]] },
+  { nama: 'Ayam Geprek', emoji: '🍗', warna: '#d64545', menu: [['Ayam Geprek Sambal Bawang', 25], ['Ayam Geprek Keju', 30], ['Ayam Bakar Madu', 32], ['Ayam Penyet', 27], ['Tahu Tempe', 8], ['Es Teh', 6]] },
+  { nama: 'Dimsum', emoji: '🥟', warna: '#6aa64e', menu: [['Siomay Ayam', 20], ['Hakau Udang', 24], ['Lumpia Kulit Tahu', 22], ['Ceker Ayam', 18], ['Bakpao Coklat', 15], ['Mantao Goreng', 16]] },
+  { nama: 'Pempek', emoji: '🐟', warna: '#5aa7dc', menu: [['Pempek Kapal Selam', 22], ['Pempek Lenjer', 18], ['Pempek Adaan', 18], ['Pempek Kulit', 16], ['Tekwan', 20], ['Model', 22]] },
+  { nama: 'Martabak', emoji: '🥞', warna: '#a0522d', menu: [['Martabak Manis Coklat Keju', 35], ['Martabak Manis Pandan', 38], ['Martabak Telur', 32], ['Martabak Mini', 15], ['Roti Bakar', 20], ['Pisang Bakar', 18]] },
+  { nama: 'Masakan Jepang', emoji: '🍣', warna: '#d98ad6', menu: [['Ramen', 38], ['Sushi Roll', 35], ['Chicken Katsu', 33], ['Beef Teriyaki', 42], ['Takoyaki', 22], ['Ocha', 8]] },
+  { nama: 'Kopi & Teh', emoji: '☕', warna: '#7a5634', menu: [['Es Kopi Susu', 20], ['Kopi Hitam', 12], ['Cappuccino', 25], ['Teh Tarik', 15], ['Es Teh Manis', 8], ['Coklat Panas', 18]] },
+  { nama: 'Es Krim & Jus', emoji: '🍦', warna: '#2f7f7a', menu: [['Es Krim 2 Rasa', 18], ['Jus Alpukat', 20], ['Jus Mangga', 18], ['Es Campur', 18], ['Es Kelapa Muda', 15], ['Smoothie Stroberi', 22]] }
 ];
 const MEJA = [];
 let pesanan = [];
@@ -978,24 +980,33 @@ function kartu(emoji, judul, html, aksiLabel, aksiFn) {
 const rupiah = (k) => 'Rp' + k + '.000';
 function bukaKios(i) {
   const k = KIOS[i];
-  const html = '<div class="menu">' + k.menu.map((m, j) => `<label class="menu-item"><input type="checkbox" value="${j}"><span>${m[0]}</span><b>${rupiah(m[1])}</b></label>`).join('') + '</div>' +
+  const html = '<div class="menu">' + k.menu.map((m, j) => `<div class="menu-item" data-j="${j}"><span>${m[0]}<small>${rupiah(m[1])}</small></span><button class="qty" data-d="-1">−</button><b class="jml">0</b><button class="qty" data-d="1">+</button></div>`).join('') + '</div><div class="total">Total: <b id="total">Rp0</b></div>' +
     (pesanan.length ? `<div class="catatan">Pesanan kalian: ${pesanan.map(p => p.emoji + ' ' + p.nama).join(', ')}</div>` : '<div class="catatan">Pilih menu, lalu duduk di meja mana saja. Makanan diantar ke meja kalian.</div>');
   kartu(k.emoji, k.nama, html, 'Pesan', () => {
-    const dipilih = [...document.querySelectorAll('#k-isi input:checked')].map(x => k.menu[+x.value]);
+    const dipilih = [];
+    document.querySelectorAll('#k-isi .menu-item').forEach(r => { const n = +r.querySelector('.jml').textContent; for (let q = 0; q < n; q++) dipilih.push(k.menu[+r.dataset.j]); });
     if (!dipilih.length) { hint('Belum ada menu yang dipilih.'); return; }
     for (const m of dipilih) pesanan.push({ nama: m[0], emoji: k.emoji, warna: k.warna });
-    pesanan = pesanan.slice(-6);
-    hint(`Pesanan dicatat: ${dipilih.map(m => m[0]).join(', ')}. Yuk cari meja!`, 3500);
+    pesanan = pesanan.slice(-9);
+    const ringkas = {}; dipilih.forEach(m => ringkas[m[0]] = (ringkas[m[0]] || 0) + 1);
+    hint(`Pesanan dicatat: ${Object.entries(ringkas).map(([n, q]) => q + '× ' + n).join(', ')}. Yuk cari meja!`, 3500);
     if (duduk && duduk.meja) taruhMakanan(duduk.meja);
     else bicara(pick(['Wah, kelihatannya enak!', 'Aku juga lapar nih.', 'Pilihan bagus, sayang.']));
   });
   $('k-aksi').textContent = 'Pesan';
+  $('k-isi').onclick = (e) => {
+    const b = e.target.closest('.qty'); if (!b) return;
+    const row = b.closest('.menu-item'), j = row.querySelector('.jml');
+    j.textContent = clamp(+j.textContent + +b.dataset.d, 0, 9);
+    let tot = 0; document.querySelectorAll('#k-isi .menu-item').forEach(r => tot += +r.querySelector('.jml').textContent * k.menu[+r.dataset.j][1]);
+    $('total').textContent = rupiah(tot).replace('Rp0.000', 'Rp0');
+  };
 }
 function taruhMakanan(m) {
   for (const o of m.makanan) scene.remove(o);
   m.makanan = [];
   pesanan.forEach((p, i) => {
-    const g = new THREE.Group(); g.position.set(m.x - 0.6 + (i % 3) * 0.6, 0.8, m.z + 0.25 - Math.floor(i / 3) * 0.4); scene.add(g);
+    const g = new THREE.Group(); g.position.set(m.x - 0.6 + (i % 3) * 0.6, 0.8, m.z + 0.3 - Math.floor(i / 3) * 0.3); scene.add(g);
     mesh(cyl(0.17, 0.12, 0.1, 10), '#f8f4ea', 0, 0.05, 0, g, false);
     mesh(cyl(0.14, 0.14, 0.03, 10), p.warna, 0, 0.1, 0, g, false);
     m.makanan.push(g);
@@ -1063,7 +1074,7 @@ function mulaiFilm(f) {
   camYaw = 0; camPitch = mode === 'tpp' ? 0.12 : -0.12;
   tampilBerdiri(true);
   hint('Penonton lain mulai masuk… film dimulai sebentar lagi 🍿', 4000);
-  setTimeout(() => bicara('Aku pegang tanganmu terus ya selama filmnya.'), 1500);
+  setTimeout(() => bicara(pick(['Filmnya kayaknya seru.', 'Kamu mau popcorn?', 'Aku suka nonton bareng kamu.'])), 1500);
   // penonton lain
   const kosong = BIOS.kursi.filter(k => !k.terisi).sort(() => Math.random() - 0.5);
   const jumlah = Math.min(kosong.length, F.penonton || 22);
@@ -1113,13 +1124,20 @@ function updateGedung(dt, t, dalam) {
     if (N.tunda > 0) { N.tunda -= dt; N.P.group.visible = false; continue; }
     N.P.group.visible = N.vis !== false;
     let moving = false;
+    if (N.marah > 0) N.marah -= dt;
     if (N.duduk) {
       N.P.group.position.set(N.x, 0.52 - N.P.hip + (N.kursi && !N.pergi ? N.kursi.h : 0), N.z);
       for (const l of N.P.legs) l.rotation.x = -1.45;
       if (N.makan) N.P.headParts[0].rotation.x = 0.25 + Math.sin(t * 3 + i) * 0.12;
     } else {
       if (!N.jalur.length && N.keliling) { const b = N.keliling; N.jalur = [[rand(b.x1 + 4, b.x2 - 4), rand(b.z1 + 4, b.z2 - 3)]]; N.diamT = rand(1, 4); }
-      if (N.diamT > 0) N.diamT -= dt;
+      if (!N.jalur.length && N.jalan) rencanaJalan(N);
+      if (N.marah > 0) {
+        const dx = player.x - N.x, dz = player.z - N.z, d = Math.hypot(dx, dz);
+        N.yaw += angDiff(N.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
+        if (d > 1.25 && d < 12) { const st = Math.min(d - 1.25, 2.2 * dt); N.x += dx / d * st; N.z += dz / d * st; moving = true; }
+      }
+      else if (N.diamT > 0) N.diamT -= dt;
       else if (N.jalur.length) {
         const [tx, tz] = N.jalur[0], dx = tx - N.x, dz = tz - N.z, d = Math.hypot(dx, dz);
         if (d < 0.15) {
@@ -1145,7 +1163,62 @@ function updateGedung(dt, t, dalam) {
   if (cullT <= 0) {
     cullT = 0.4;
     for (const A of animals) A.group.visible = Math.hypot(A.group.position.x - player.x, A.group.position.z - player.z) < 120;
-    for (const N of npcs) if (!N.local) N.vis = Math.hypot(N.x - player.x, N.z - player.z) < 70;
+    for (const N of npcs) if (!N.local) N.vis = Math.hypot(N.x - player.x, N.z - player.z) < 60;
+  }
+}
+
+/* ---------- pengunjung di seluruh taman & teguran saat ditabrak ---------- */
+function rencanaJalan(N) {
+  const J = N.jalan, n = J.pts.length;
+  let j = N.idx + Math.round(rand(-45, 45));
+  if (J.closed) j = ((j % n) + n) % n; else j = clamp(j, 0, n - 1);
+  const step = j > N.idx ? 2 : -2, jalur = [];
+  for (let k = N.idx; step > 0 ? k < j : k > j; k += step) {
+    const a = J.pts[k], b = J.pts[clamp(k + 1, 0, n - 1)] || a;
+    let nx = -(b[1] - a[1]), nz = b[0] - a[0]; const L = Math.hypot(nx, nz) || 1; nx /= L; nz /= L;
+    jalur.push([a[0] + nx * N.off, a[1] + nz * N.off]);
+  }
+  N.idx = j; N.jalur = jalur; N.diamT = rand(2, 9);
+}
+{
+  const total = jalurJalan.reduce((a, r) => a + r.pts.length, 0);
+  for (let i = 0; i < (F.pengunjung || 28); i++) {
+    let r = Math.random() * total, J = jalurJalan[0];
+    for (const x of jalurJalan) { if (r < x.pts.length) { J = x; break; } r -= x.pts.length; }
+    const idx = Math.floor(Math.random() * J.pts.length), p0 = J.pts[idx];
+    const N = buatNpc(p0); N.jalan = J; N.idx = idx; N.off = rand(-J.w * 0.35, J.w * 0.35); N.speed = rand(0.9, 1.35);
+    N.x = p0[0]; N.z = p0[1]; N.diamT = rand(0, 5);
+  }
+}
+const KATA_TABRAK = D.kataTabrak || ['Hati-hati kalau jalan! Pakai mata dong!'];
+const gelNpc = document.createElement('div'); gelNpc.id = 'gelembung-npc'; gelNpc.className = 'sembunyi'; $('hud').appendChild(gelNpc);
+let npcBicara = null, npcBicaraT = 0, tegurJeda = 0;
+function tabrakNpc(mx, mz) {
+  for (const N of npcs) {
+    if (N.local || N.tunda > 0 || N.vis === false || !N.P.group.visible) continue;
+    const dx = N.x - player.x, dz = N.z - player.z, d = Math.hypot(dx, dz), r = N.duduk ? 0.62 : 0.68;
+    if (d < r && d > 1e-4) {
+      player.x = N.x - dx / d * r; player.z = N.z - dz / d * r;
+      const arah = (dx * mx + dz * mz) / d;
+      if (arah > 0.3 && tegurJeda <= 0 && !(N.tegurT > performance.now() - 8000)) tegur(N);
+    }
+  }
+}
+function tegur(N) {
+  N.tegurT = performance.now(); tegurJeda = 3;
+  if (!N.duduk) { N.marah = 4; N.diamT = 0; }
+  npcBicara = N; npcBicaraT = 2.8;
+  gelNpc.textContent = pick(KATA_TABRAK); gelNpc.classList.remove('sembunyi');
+  setTimeout(() => bicara(pick(D.maafPasangan || ['Maaf ya, nggak sengaja.']), 3), 3000);
+}
+function updateTegur(dt) {
+  if (tegurJeda > 0) tegurJeda -= dt;
+  if (npcBicaraT > 0) {
+    npcBicaraT -= dt;
+    const N = npcBicara;
+    tmpA.set(N.x, N.duduk ? 1.6 : 2.05, N.z).project(camera);
+    if (tmpA.z < 1) { gelNpc.style.left = clamp((tmpA.x + 1) / 2 * innerWidth, 90, innerWidth - 90) + 'px'; gelNpc.style.top = clamp((1 - tmpA.y) / 2 * innerHeight, 80, innerHeight - 40) + 'px'; }
+    if (npcBicaraT <= 0) gelNpc.classList.add('sembunyi');
   }
 }
 $('btn-berdiri').onclick = berdiri;
@@ -1463,6 +1536,7 @@ function update(dt, t) {
     mx /= ml; mz /= ml;
     player.x += mx * spd * dt; player.z += mz * spd * dt;
     const p = { x: player.x, z: player.z }; resolve(p, 0.38); player.x = p.x; player.z = p.z;
+    tabrakNpc(mx, mz);
   }
   player.speed = lerp(player.speed, spd, Math.min(1, dt * 8));
   const targetT = mode === 'tpp' ? 1 : 0;
@@ -1496,9 +1570,14 @@ function update(dt, t) {
   kamu.arms[0].pivot.getWorldPosition(tmpA); dia.arms[1].pivot.getWorldPosition(tmpB);
   const hand = tmpV.copy(tmpA).lerp(tmpB, lerp(0.58, 0.5, e));
   hand.y = lerp(1.18, 0.86, e) + Math.sin(player.phase) * 0.02;
-  aimArm(kamu, kamu.arms[0], hand); aimArm(dia, dia.arms[1], hand);
-  swingArm(kamu.arms[1], -Math.sin(player.phase) * 0.5 * Math.min(1, player.speed / 3), 1);
-  swingArm(dia.arms[0], Math.sin(partner.phase) * 0.5 * Math.min(1, partner.speed / 3), -1);
+  if (duduk) {
+    const lengan = duduk.meja ? -1.15 : -0.75;
+    swingArm(kamu.arms[0], lengan, 1); swingArm(kamu.arms[1], lengan, -1); swingArm(dia.arms[0], lengan, 1); swingArm(dia.arms[1], lengan, -1);
+  } else {
+    aimArm(kamu, kamu.arms[0], hand); aimArm(dia, dia.arms[1], hand);
+    swingArm(kamu.arms[1], -Math.sin(player.phase) * 0.5 * Math.min(1, player.speed / 3), 1);
+    swingArm(dia.arms[0], Math.sin(partner.phase) * 0.5 * Math.min(1, partner.speed / 3), -1);
+  }
   for (const h of kamu.headParts) h.visible = modeT > 0.35;
 
   // kamera
@@ -1524,7 +1603,7 @@ function update(dt, t) {
 
   // hewan
   for (const A of animals) if (A.group.visible) updateAnimal(A, dt, t);
-  updateGedung(dt, t, dalam);
+  updateGedung(dt, t, dalam); updateTegur(dt);
   // jip
   {
     const ahead = kurvaSafari.getPointAt((jip.u + 0.006) % 1);

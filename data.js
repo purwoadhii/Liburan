@@ -23,6 +23,13 @@ window.SAFARI = {
     'Hari ini rasanya pengin lama-lama aja.'
   ],
 
+  // Kalau kamu menabrak pengunjung lain
+  kataTabrak: [
+    'Hati-hati kalau jalan! Pakai mata dong!',
+    'Aduh! Hati-hati dong kalau jalan, pakai mata!'
+  ],
+  maafPasangan: ['Maaf ya, nggak sengaja.', 'Maaf, Kak. Kami kurang hati-hati.'],
+
   // Komentar pasangan saat pertama kali masuk sebuah area
   komentarZona: {
     parkir: 'Sudah sampai! Yuk masuk lewat gerbang.',
