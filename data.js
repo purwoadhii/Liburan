@@ -58,6 +58,7 @@ window.SAFARI = {
     panda: 'Pandanya lagi makan bambu. Gemas!',
     airterjun: 'Dengar suara airnya? Adem banget di sini.',
     foodcourt: 'Banyak banget pilihannya. Kamu mau makan apa?',
-    bioskop: 'Nonton film yuk, aku yang pilih tempat duduknya.'
+    bioskop: 'Nonton film yuk, aku yang pilih tempat duduknya.',
+    burung: 'Ayo masuk ke sangkar burung. Pelan-pelan ya, biar burungnya nggak kaget.'
   }
 };
