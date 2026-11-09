@@ -1478,6 +1478,17 @@ function animMakan(dt) {
 }
 function dudukMeja(m) {
   duduk = { meja: m, a: [m.x - 0.45, m.z + 0.85], b: [m.x + 0.45, m.z + 0.85], yaw: 0, sejak: 0 };
+  // kalau di depan sudah ada orang, dia mengeluh lalu pergi
+  const depan = m.kursiU.map(k => k.n).filter(N => N && N.duduk);
+  if (depan.length) {
+    NUMPANG.jeda = Math.max(NUMPANG.jeda, 20);
+    setTimeout(() => {
+      if (!duduk || duduk.meja !== m) return;
+      const N = pick(depan); if (!N.duduk) return;
+      npcBicara = N; npcBicaraT = 3.5; gelNpc.textContent = pick(D.keluhDuduk || ['Ini orang siapa sih? Main duduk aja, nggak permisi! Nggak sopan banget.']); gelNpc.classList.remove('sembunyi');
+      depan.forEach((n, i) => setTimeout(() => { if (n.duduk) n.makanSisa = 0.01; }, 4200 + i * 700));
+    }, 1300);
+  }
   if (pesanan.some(p => !p.dikirim)) kirimPelayan(m);
   else if (pesanan.some(p => p.meja === m)) taruhMakanan(m);
   else hint('Belum pesan makanan. Pilih kios dulu, nanti pelayan mengantarnya ke meja ini.', 3500);

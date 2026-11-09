@@ -45,6 +45,8 @@ window.SAFARI = {
   jawabBoleh: ['Terima kasih ya!', 'Makasih banyak, Kak.'],
   jawabPelit: ['Dasar pelit!', 'Huh, dasar pelit!'],
   setelahPelit: ['Biarin aja, kita lagi pengin berdua kan.'],
+  // Kalau kalian duduk di meja yang sudah ada orangnya, dia mengeluh lalu pergi
+  keluhDuduk: ['Ini orang siapa sih? Main duduk aja, nggak permisi! Nggak sopan banget.'],
 
   // Komentar pasangan saat pertama kali masuk sebuah area
   komentarZona: {
