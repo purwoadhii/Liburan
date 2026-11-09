@@ -1633,6 +1633,32 @@ function posisiDuduk() {
   kamu.group.position.set(player.x, 0.52 - kamu.hip + hh, player.z); dia.group.position.set(partner.x, 0.52 - dia.hip + hh, partner.z);
   kamu.group.rotation.y = dia.group.rotation.y = duduk.yaw + Math.PI;
   for (const P of [kamu, dia]) for (const l of P.legs) l.rotation.x = -1.45;
+  if (duduk.anim) animNaikTurun(hh);
+}
+// animasi naik / turun jip bergantian: naik cowok dulu lalu menarik tangan cewek, turun cewek dulu dibantu cowok
+function animNaikTurun(hh) {
+  const A = duduk.anim, t = (performance.now() - A.t0) / 1000 * (window.__lambat || 1);
+  const urut = A.turun ? [[dia, 'b', 0], [kamu, 'a', 0.85]] : [[kamu, 'a', 0], [dia, 'b', 0.85]];
+  for (const [P, sisi, mulai] of urut) {
+    const g = A.tanah[sisi], s = duduk[sisi];
+    let k = clamp((t - mulai) / 0.9, 0, 1); if (A.turun) k = 1 - k;
+    if ((!A.turun && k >= 1) || (A.turun && k <= 0 && t > mulai + 0.9)) { if (A.turun) { P.group.position.set(g[0], 0, g[1]); for (const l of P.legs) l.rotation.x = 0; P.group.rotation.y = Math.atan2(s[0] - g[0], s[1] - g[1]) + Math.PI; } continue; }
+    // titik pijakan di samping jip, lalu melompat masuk ke kursi
+    const pijak = [lerp(g[0], s[0], 0.55), lerp(g[1], s[1], 0.55)];
+    let x, z, y, kaki;
+    const yDuduk = 0.52 - P.hip + hh;
+    if (k < 0.45) { const q = k / 0.45; x = lerp(g[0], pijak[0], q); z = lerp(g[1], pijak[1], q); y = 0; kaki = Math.sin(q * Math.PI * 3) * 0.5; }
+    else { const q = (k - 0.45) / 0.55, e = q * q * (3 - 2 * q); x = lerp(pijak[0], s[0], e); z = lerp(pijak[1], s[1], e); y = lerp(0.05, yDuduk, e) + Math.sin(q * Math.PI) * 0.45; kaki = q < 0.5 ? -0.9 - q : -1.45; }
+    P.group.position.set(x, y, z);
+    const arah = Math.atan2(s[0] - g[0], s[1] - g[1]);
+    P.group.rotation.y = k > 0.8 ? arah + angDiff(arah, duduk.yaw + Math.PI) * (k - 0.8) / 0.2 : arah;
+    P.legs[0].rotation.x = kaki; P.legs[1].rotation.x = k < 0.45 ? -kaki : kaki;
+  }
+  for (const [P, sisi, mulai] of urut) {
+    const g = A.tanah[sisi], s = duduk[sisi];
+    if (!A.turun && t < mulai) { P.group.position.set(g[0], 0, g[1]); P.group.rotation.y = Math.atan2(s[0] - g[0], s[1] - g[1]); for (const l of P.legs) l.rotation.x = 0; }
+  }
+  if (t > 1.9) { const selesai = A.selesai; duduk.anim = null; if (selesai) selesai(); }
 }
 
 /* ---------- film ---------- */
@@ -2760,7 +2786,7 @@ function updateJip(dt) {
     duduk.yaw = J.group.rotation.y + Math.PI;
     if (NAIK.yawJip != null) camYaw += angDiff(NAIK.yawJip, J.group.rotation.y);
     NAIK.yawJip = J.group.rotation.y;
-    if (J.berhenti >= 0) { b.textContent = '🚶 Turun di ' + HALTE[J.berhenti].nama.replace('Zona ', ''); b.classList.remove('sembunyi'); NAIK.halte = J.berhenti; }
+    if (J.berhenti >= 0 && !NAIK.turun && !duduk.anim) { b.textContent = '🚶 Turun di ' + HALTE[J.berhenti].nama.replace('Zona ', ''); b.classList.remove('sembunyi'); NAIK.halte = J.berhenti; }
     else b.classList.add('sembunyi');
     if (J.berhenti >= 0 && NAIK.terakhir !== J.berhenti) { NAIK.terakhir = J.berhenti; if (NAIK.sudahJalan) hint('Berhenti di halte ' + HALTE[J.berhenti].nama.replace('Zona ', '') + '. Mau turun?', 3000); }
     if (J.berhenti < 0) NAIK.sudahJalan = true;
@@ -2774,20 +2800,24 @@ function updateJip(dt) {
 function naikJip(J) {
   if (J.berhenti < 0) { hint('Jipnya sudah jalan. Tunggu jip berikutnya di halte ya.', 3000); return; }
   if (!bayar(hargaJip() * 2)) { hint(`Uangnya nggak cukup. Naik jip ${fmtRp(hargaJip())} per orang.`, 3000); return; }
+  if (J.sisa < 0.014) J.tunda += 0.014 - J.sisa;   // jip menunggu sampai keduanya selesai naik
   NAIK = { J, terakhir: J.berhenti, sudahJalan: false };
-  duduk = { jip: true, a: [0, 0], b: [0, 0], yaw: 0, h: 0.6, sejak: 0 };
+  duduk = { jip: true, a: [0, 0], b: [0, 0], yaw: 0, h: 0.6, sejak: 0, anim: { t0: performance.now(), turun: false, tanah: { a: [player.x, player.z], b: [partner.x, partner.z] } } };
   tampilBerdiri(false); BALIK.sisa = 0; camYaw = J.group.rotation.y + Math.PI; LIHAT.x = 0; camPitch = mode === 'tpp' ? 0.2 : 0.05;
   hint('Kalian naik Safari ' + J.no + '. Turun di halte mana saja yang kalian mau.', 3500);
   setTimeout(() => bicara(pick(['Seru! Kita keliling naik jip.', 'Duduk dekat aku ya, nanti kita lihat hewannya dari dekat.'])), 900);
 }
 function turunJip() {
-  if (!NAIK || NAIK.J.berhenti < 0) return;
-  const h = HALTE[NAIK.J.berhenti];
-  NAIK = null; duduk = null;
-  kamu.group.position.y = 0; dia.group.position.y = 0;
-  player.x = h.naikX; player.z = h.naikZ; partner.x = h.naikX + 0.7; partner.z = h.naikZ;
-  $('btn-jip').classList.add('sembunyi');
-  hint('Kalian turun di halte ' + h.nama.replace('Zona ', '') + '. Naik lagi kalau jip berikutnya lewat.', 3500);
+  if (!NAIK || NAIK.J.berhenti < 0 || NAIK.turun || duduk.anim) return;
+  const J = NAIK.J, h = HALTE[J.berhenti];
+  if (J.sisa < 0.014) J.tunda += 0.014 - J.sisa;   // jip menunggu sampai keduanya turun
+  NAIK.turun = true; $('btn-jip').classList.add('sembunyi');
+  duduk.anim = { t0: performance.now(), turun: true, tanah: { a: [h.naikX, h.naikZ], b: [h.naikX + 0.7, h.naikZ] }, selesai: () => {
+    NAIK = null; duduk = null;
+    kamu.group.position.y = 0; dia.group.position.y = 0;
+    player.x = h.naikX; player.z = h.naikZ; partner.x = h.naikX + 0.7; partner.z = h.naikZ;
+    hint('Kalian turun di halte ' + h.nama.replace('Zona ', '') + '. Naik lagi kalau jip berikutnya lewat.', 3500);
+  } };
 }
 $('btn-jip').onclick = () => { if (NAIK) turunJip(); else { const J = JIP[+$('btn-jip').dataset.j]; if (J) naikJip(J); } };
 function bukaJadwal(h) {
@@ -2916,7 +2946,10 @@ function update(dt, t) {
   kamu.arms[0].pivot.getWorldPosition(tmpA); dia.arms[1].pivot.getWorldPosition(tmpB);
   const hand = tmpV.copy(tmpA).lerp(tmpB, lerp(0.58, 0.5, e));
   hand.y = lerp(1.18, 0.86, e) + Math.sin(player.phase) * 0.02;
-  if (duduk) {
+  if (duduk && duduk.anim) {
+    // saling berpegangan tangan saat naik / turun jip
+    aimArm(kamu, kamu.arms[0], hand); aimArm(dia, dia.arms[1], hand); swingArm(kamu.arms[1], 0, -1); swingArm(dia.arms[0], 0, 1);
+  } else if (duduk) {
     const lengan = duduk.meja ? -1.15 : -0.75;
     if (!animMakan(dt)) { swingArm(kamu.arms[0], lengan, 1); swingArm(kamu.arms[1], lengan, -1); swingArm(dia.arms[0], lengan, 1); swingArm(dia.arms[1], lengan, -1); }
   } else if (animTopi(dt)) {
