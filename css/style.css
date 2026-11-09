@@ -103,3 +103,8 @@ h2{margin:4px 0 8px;color:var(--hijau)}
 #am-makan{background:var(--aksen);color:#fff;padding:10px 16px;border-radius:999px;font-weight:500}
 #hud.amati-on>*:not(#gelembung):not(#petunjuk){display:none!important}
 #hud.amati-on #petunjuk{top:auto;bottom:210px}
+
+#uang{position:absolute;left:max(12px,env(safe-area-inset-left));top:calc(max(12px,env(safe-area-inset-top)) + 80px);background:var(--kaca);padding:5px 12px;border-radius:999px;box-shadow:var(--bayang);font-size:14px;font-weight:500}
+#btn-balas{background:#fff3e6;color:var(--teks);border:2px solid #e8836f!important;padding:10px 16px;border-radius:999px;font-size:15px;font-weight:500;box-shadow:var(--bayang)}
+#gelembung-kamu{position:absolute;transform:translate(-50%,-100%);background:#fde4ec;border:2px solid #e07a9a;padding:8px 12px;border-radius:14px;box-shadow:var(--bayang);font-size:14px;max-width:min(240px,70vw);text-align:center;line-height:1.3;font-weight:500}
+#balas-teks{width:100%;font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:2px solid #dfe7da;background:#fff;user-select:text;-webkit-user-select:text}

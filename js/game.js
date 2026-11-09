@@ -1150,7 +1150,26 @@ function lihatHidangan(p) {
 }
 
 /* ---------- waktu: pagi, siang, sore, malam ---------- */
-const WAKTU = { jam: D.jamMulai != null ? D.jamMulai : 9, lajuMenit: D.menitPerJam || 1 };
+// waktu game ikut jam global: semua pemain melihat jam yang sama, berjalan walau game ditutup
+const WAKTU = { jam: 9, menitHari: D.menitPerHari || 60, geser: 0 };
+const jamAbs = () => Date.now() / (WAKTU.menitHari * 60000) * 24 + WAKTU.geser;
+WAKTU.jam = jamAbs() % 24;
+const fmtRp = (n) => 'Rp' + Math.round(n).toLocaleString('id-ID');
+const DOMPET = { harian: D.uangHarian || 200000, jamReset: D.jamReset != null ? D.jamReset : 7, hari: null, sisa: 0 };
+const uangEl = document.createElement('div'); uangEl.id = 'uang'; uangEl.title = 'Uang jajan hari ini, kembali penuh setiap jam ' + DOMPET.jamReset + ' pagi';
+$('hud').appendChild(uangEl);
+function simpanDompet() { try { localStorage.setItem('safari_uang', JSON.stringify({ hari: DOMPET.hari, sisa: DOMPET.sisa })); } catch (e) {} uangEl.textContent = '💰 ' + fmtRp(DOMPET.sisa); }
+function cekDompet() {
+  const h = Math.floor((jamAbs() - DOMPET.jamReset) / 24);
+  if (DOMPET.hari === h) return;
+  let sv = null; try { sv = JSON.parse(localStorage.getItem('safari_uang')); } catch (e) {}
+  const lanjut = DOMPET.hari !== null;
+  if (!lanjut && sv && sv.hari === h) DOMPET.sisa = sv.sisa;
+  else { DOMPET.sisa = DOMPET.harian; if (lanjut) { hint(`Sudah jam ${DOMPET.jamReset} pagi. Uang jajan hari ini ${fmtRp(DOMPET.harian)} lagi!`, 4000); } }
+  DOMPET.hari = h; simpanDompet();
+}
+cekDompet();
+function bayar(n) { cekDompet(); if (n > DOMPET.sisa) return false; DOMPET.sisa -= n; simpanDompet(); return true; }
 const BINTANG = (() => {
   const n = 600, pos = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, e = Math.asin(Math.random() * 0.95 + 0.05), r = 700; pos[i * 3] = Math.cos(a) * Math.cos(e) * r; pos[i * 3 + 1] = Math.sin(e) * r; pos[i * 3 + 2] = Math.sin(a) * Math.cos(e) * r; }
@@ -1179,7 +1198,7 @@ function keramaian(h) {
 }
 let terangSekarang = 1;
 function updateWaktu(dt, dalam) {
-  WAKTU.jam = (WAKTU.jam + dt / (60 * WAKTU.lajuMenit)) % 24;
+  WAKTU.jam = ((jamAbs() % 24) + 24) % 24; cekDompet();
   const h = WAKTU.jam, w = infoWaktu(h);
   terangSekarang = w.terang;
   tmpCol.copy(cLangitMalam).lerp(cLangitSiang, w.terang).lerp(cLangitSenja, w.senja * 0.6);
@@ -1213,9 +1232,9 @@ function updateWaktu(dt, dalam) {
   for (const q of ANTRIAN) q.target = Math.round(q.dasar * ramai + (ramai > 0.15 ? 0.4 : 0));
   cekTopi(h);
 }
-const jamEl = document.createElement('div'); jamEl.id = 'jam'; jamEl.title = 'Ketuk untuk memajukan waktu 3 jam';
+const jamEl = document.createElement('div'); jamEl.id = 'jam'; jamEl.title = 'Waktu taman (1 hari = ' + WAKTU.menitHari + ' menit)';
 $('hud').appendChild(jamEl);
-jamEl.onclick = () => { WAKTU.jam = (WAKTU.jam + 3) % 24; hint(namaWaktu(WAKTU.jam) + ' · ' + jamTeks(WAKTU.jam)); };
+jamEl.onclick = () => hint(namaWaktu(WAKTU.jam) + ' · ' + jamTeks(WAKTU.jam) + ' · 1 hari di taman = ' + WAKTU.menitHari + ' menit');
 
 /* ---------- topi: ditawarkan saat siang terik ---------- */
 const TOPI = { dipakai: false, ditanya: false, tanyaJam: -1, anim: null, terakhirTolak: -1e9 };
@@ -1275,13 +1294,15 @@ const rupiah = (k) => 'Rp' + k + '.000';
 function bukaKios(i) {
   const k = KIOS[i];
   const html = '<div class="menu">' + k.menu.map((m, j) => `<div class="menu-item" data-j="${j}"><span>${m[0]}<small>${rupiah(m[1])}</small></span><button class="qty" data-d="-1">−</button><b class="jml">0</b><button class="qty" data-d="1">+</button></div>`).join('') + '</div><div class="total">Total: <b id="total">Rp0</b></div>' +
+    `<div class="catatan">💰 Uang kalian: <b>${fmtRp(DOMPET.sisa)}</b></div>` +
     (pesanan.length ? `<div class="catatan">Pesanan kalian: ${pesanan.map(p => p.emoji + ' ' + p.nama).join(', ')}</div>` : '<div class="catatan">Pilih menu, lalu duduk di meja mana saja. Makanan diantar ke meja kalian.</div>');
   kartu(k.emoji, k.nama, html, 'Pesan', () => {
     const dipilih = [];
     document.querySelectorAll('#k-isi .menu-item').forEach(r => { const n = +r.querySelector('.jml').textContent; for (let q = 0; q < n; q++) dipilih.push(k.menu[+r.dataset.j]); });
     if (!dipilih.length) { hint('Belum ada menu yang dipilih.'); return; }
+    const harga = dipilih.reduce((a, m) => a + m[1] * 1000, 0);
+    if (!bayar(harga)) { hint(`Uangnya nggak cukup. Totalnya ${fmtRp(harga)}, sisa uang ${fmtRp(DOMPET.sisa)}.`, 3800); setTimeout(() => bicara('Uang kita tinggal sedikit. Pilih yang lebih murah aja yuk.'), 600); return; }
     for (const m of dipilih) pesanan.push({ nama: m[0], harga: m[1], emoji: k.emoji, warna: k.warna, kios: i, minum: /^(Es |Jus|Teh|Kopi|Cappuccino|Coklat Panas|Ocha|Smoothie)/.test(m[0]), diantar: false, dikirim: false, sisa: 1 });
-    pesanan = pesanan.slice(-9);
     const ringkas = {}; dipilih.forEach(m => ringkas[m[0]] = (ringkas[m[0]] || 0) + 1);
     hint(`Pesanan dicatat: ${Object.entries(ringkas).map(([n, q]) => q + '× ' + n).join(', ')}. Yuk cari meja!`, 3500);
     if (duduk && duduk.meja) kirimPelayan(duduk.meja);
@@ -1293,7 +1314,7 @@ function bukaKios(i) {
     const row = b.closest('.menu-item'), j = row.querySelector('.jml');
     j.textContent = clamp(+j.textContent + +b.dataset.d, 0, 9);
     let tot = 0; document.querySelectorAll('#k-isi .menu-item').forEach(r => tot += +r.querySelector('.jml').textContent * k.menu[+r.dataset.j][1]);
-    $('total').textContent = rupiah(tot).replace('Rp0.000', 'Rp0');
+    $('total').textContent = rupiah(tot).replace('Rp0.000', 'Rp0') + (tot * 1000 > DOMPET.sisa ? ' (uang kurang)' : '');
   };
 }
 function jenisMenu(n) {
@@ -1396,11 +1417,24 @@ function modelMenu(p) {
 }
 
 function modelHidangan(p, parent) { const g = modelMenu(p); parent.add(g); return g; }
+// tempat di meja: 0 depan cewek, 1 depan cowok, 2 & 3 sisi seberang (kalau kursinya kosong). Tiap tempat muat 2 hidangan
+const TEMPAT = [[-0.45, 0.3], [0.45, 0.3], [-0.45, -0.3], [0.45, -0.3]];
+function slotBebas(m) {
+  const pakai = new Set(pesanan.filter(p => p.meja === m && p.slot).map(p => p.slot[0] * 2 + p.slot[1]));
+  const r = [];
+  for (let t = 0; t < 4; t++) { if (t >= 2 && m.kursiU[t - 2].n) continue; for (let k = 0; k < 2; k++) if (!pakai.has(t * 2 + k)) r.push([t, k]); }
+  return r;
+}
+function pilihSlot(m, orang) {
+  const b = slotBebas(m);
+  return b.find(x => x[0] === orang) || b.find(x => x[0] === orang + 2) || b[0] || null;
+}
 function taruhMakanan(m) {
   for (const o of m.makanan) { scene.remove(o); const ix = interactables.findIndex(x => x.obj === o); if (ix >= 0) interactables.splice(ix, 1); }
   m.makanan = [];
-  pesanan.filter(p => p.diantar && p.meja === m).forEach((p, i) => {
-    const g = new THREE.Group(); g.position.set(m.x - 0.6 + (i % 3) * 0.6, 0.8, m.z + 0.3 - Math.floor(i / 3) * 0.3); scene.add(g);
+  pesanan.filter(p => p.diantar && p.meja === m && p.slot).forEach(p => {
+    const [t, k] = p.slot;
+    const g = new THREE.Group(); g.position.set(m.x + TEMPAT[t][0] + (k ? 0.17 : -0.12), 0.8, m.z + TEMPAT[t][1]); scene.add(g);
     modelHidangan(p, g);
     aturSisa(p);
     m.makanan.push(g);
@@ -1420,9 +1454,25 @@ function tampilMakan() {
   $('btn-makan').classList.toggle('sembunyi', !ada || !!(duduk && duduk.makanT > 0));
 }
 let pelayanAktif = 0;
+let rantaiTanya = Promise.resolve();
+function tanyaPelayan(N, p) {
+  // satu pertanyaan per hidangan: untuk Mbak atau Mas?
+  return new Promise(res => {
+    const tanya = `${p.nama}? Untuk Mbak atau Mas?`;
+    npcBicara = N; npcBicaraT = 99; npcKonteks = 'pelayan'; gelNpc.textContent = tanya; gelNpc.classList.remove('sembunyi');
+    kartu('🍽️', 'Pelayan bertanya', `<p style="text-align:center;font-size:17px">"${tanya}"</p>`, 'Mbak 👩', () => res(0));
+    $('k-tutup').textContent = 'Mas 👨'; kartuTidak = () => res(1);
+  });
+}
 function kirimPelayan(m) {
+  const transit = pesanan.filter(p => p.dikirim && !p.diantar && p.meja === m).length;
+  const muat = Math.max(0, slotBebas(m).length - transit);
+  const antre = pesanan.filter(p => !p.dikirim);
+  const kirim = antre.slice(0, muat);
+  if (antre.length > kirim.length) angkatPiring(m);
+  if (antre.length > kirim.length) setTimeout(() => hint(kirim.length ? 'Mejanya nggak muat semua. Sisa pesanan diantar setelah ada piring kosong.' : 'Mejanya penuh. Pesanan berikutnya diantar setelah piring kosong diangkat.', 4000), kirim.length ? 3200 : 0);
   const per = {};
-  pesanan.filter(p => !p.dikirim).forEach(p => { p.dikirim = true; p.meja = m; (per[p.kios] = per[p.kios] || []).push(p); });
+  kirim.forEach(p => { p.dikirim = true; p.meja = m; (per[p.kios] = per[p.kios] || []).push(p); });
   const grup = Object.entries(per);
   if (!grup.length) return;
   hint('Pesanan sedang disiapkan, sebentar lagi diantar 🍽️', 3000);
@@ -1432,22 +1482,53 @@ function kirimPelayan(m) {
     N.x = k.depan[0]; N.z = k.depan[1]; N.speed = 1.5; N.pelayan = true; N.tunda = 2.5 + n * 1.8;
     const baki = new THREE.Group(); baki.position.set(0, 1.02, 0.42); N.P.group.add(baki);
     mesh(box(0.55, 0.03, 0.38), '#6b4a2b', 0, 0, 0, baki, false);
-    items.slice(0, 4).forEach((p, j) => { const h = modelHidangan({ ...p }, baki); h.position.set(-0.15 + (j % 2) * 0.3, 0.02, -0.08 + Math.floor(j / 2) * 0.16); h.scale.setScalar(0.8); });
+    const diBaki = items.slice(0, 4).map((p, j) => { const h = modelHidangan({ ...p }, baki); h.position.set(-0.15 + (j % 2) * 0.3, 0.02, -0.08 + Math.floor(j / 2) * 0.16); h.scale.setScalar(0.8); return h; });
     const sisi = n % 2 ? -1 : 1;
     N.jalur = [[m.x + sisi * 1.45, m.z + 1.9], [m.x + sisi * 1.4, m.z + 0.35]];
     pelayanAktif++;
     N.onArrive = () => {
       N.yaw = sisi > 0 ? Math.PI / 2 : -Math.PI / 2; N.diamT = 1.2;
-      setTimeout(() => {
-        items.forEach(p => p.diantar = true); N.P.group.remove(baki); N.bawa = false;
-        taruhMakanan(m);
-        npcBicara = N; npcBicaraT = 2.6; gelNpc.textContent = pick(['Silakan, selamat menikmati!', 'Pesanannya sudah datang, selamat makan!', 'Ini pesanannya ya, Kak.']); gelNpc.classList.remove('sembunyi');
+      rantaiTanya = rantaiTanya.then(async () => {
+        let urut = 0;
+        for (const p of items) {
+          let orang = urut++ % 2;
+          if (duduk && duduk.meja === m) orang = await tanyaPelayan(N, p);
+          const sl = pilihSlot(m, orang);
+          if (!sl) { p.dikirim = false; p.meja = null; continue; }
+          p.slot = sl; p.diantar = true;
+          if (diBaki.length) baki.remove(diBaki.shift());
+          taruhMakanan(m);
+        }
+        N.P.group.remove(baki); N.bawa = false;
+        npcBicara = N; npcBicaraT = 2.6; npcKonteks = 'pelayan'; gelNpc.textContent = pick(['Silakan, selamat menikmati!', 'Selamat makan, Kak!', 'Silakan dinikmati ya.']); gelNpc.classList.remove('sembunyi');
         if (duduk && duduk.meja === m) hint('Makanan datang! Ketuk 🍽️ Makan', 3000);
         N.jalur = [[m.x + sisi * 1.45, m.z + 1.9], k.depan]; N.pergi = true; pelayanAktif--;
-      }, 1200);
+      });
     };
     N.bawa = true;
   });
+}
+// piring kosong diangkat, lalu pesanan yang tertunda diantar
+function angkatPiring(m) {
+  if (m.angkat) return;
+  const kosong = pesanan.filter(p => p.meja === m && p.diantar && p.sisa <= 0.02);
+  if (!kosong.length) return;
+  m.angkat = true;
+  const k = KIOS.reduce((a, b) => Math.hypot(b.depan[0] - m.x, b.depan[1] - m.z) < Math.hypot(a.depan[0] - m.x, a.depan[1] - m.z) ? b : a);
+  const N = buatNpc(k.depan, { baju: '#f8f4ea', celana: '#26262b', rambut: '#1a1a1a' });
+  N.x = k.depan[0]; N.z = k.depan[1]; N.speed = 1.6; N.pelayan = true; N.tunda = 2;
+  N.jalur = [[m.x - 1.45, m.z + 1.9], [m.x - 1.4, m.z + 0.35]];
+  N.onArrive = () => {
+    N.yaw = -Math.PI / 2; N.diamT = 1.5;
+    npcBicara = N; npcBicaraT = 2.6; npcKonteks = 'pelayan'; gelNpc.textContent = pick(['Permisi, piring kosongnya saya angkat ya, Kak.', 'Saya bereskan piringnya dulu ya.']); gelNpc.classList.remove('sembunyi');
+    setTimeout(() => {
+      pesanan = pesanan.filter(p => !(p.meja === m && p.diantar && p.sisa <= 0.02));
+      taruhMakanan(m); m.angkat = false;
+      const baki = new THREE.Group(); baki.position.set(0, 1.02, 0.42); N.P.group.add(baki); mesh(box(0.55, 0.03, 0.38), '#6b4a2b', 0, 0, 0, baki, false); N.bawa = true;
+      N.jalur = [[m.x - 1.45, m.z + 1.9], k.depan]; N.pergi = true;
+      if (pesanan.some(p => !p.dikirim) && duduk && duduk.meja === m) setTimeout(() => kirimPelayan(m), 1500);
+    }, 1400);
+  };
 }
 function mulaiMakan() {
   if (!duduk || !duduk.meja) return;
@@ -1471,7 +1552,8 @@ function animMakan(dt) {
     kamu.headParts[0].rotation.x = dia.headParts[0].rotation.x = 0;
     const habis = !pesanan.some(p => p.diantar && p.meja === duduk.meja && p.sisa > 0.02);
     hint(habis ? 'Habis! Kenyang 😋' : 'Masih ada sisa. Ketuk 🍽️ Makan lagi kalau mau.', 2800);
-    if (habis) setTimeout(() => bicara(pick(['Kenyang banget. Makasih ya sudah nemenin makan.', 'Habis ini jalan lagi yuk, biar turun makanannya.'])), 600);
+    if (habis && !pesanan.some(p => !p.dikirim)) setTimeout(() => bicara(pick(['Kenyang banget. Makasih ya sudah nemenin makan.', 'Habis ini jalan lagi yuk, biar turun makanannya.'])), 600);
+    angkatPiring(duduk.meja);
     tampilMakan();
   }
   return true;
@@ -1485,7 +1567,7 @@ function dudukMeja(m) {
     setTimeout(() => {
       if (!duduk || duduk.meja !== m) return;
       const N = pick(depan); if (!N.duduk) return;
-      npcBicara = N; npcBicaraT = 3.5; gelNpc.textContent = pick(D.keluhDuduk || ['Ini orang siapa sih? Main duduk aja, nggak permisi! Nggak sopan banget.']); gelNpc.classList.remove('sembunyi');
+      npcBicara = N; npcBicaraT = 3.5; npcKonteks = 'keluh'; gelNpc.textContent = pick(D.keluhDuduk || ['Ini orang siapa sih? Main duduk aja, nggak permisi! Nggak sopan banget.']); gelNpc.classList.remove('sembunyi');
       depan.forEach((n, i) => setTimeout(() => { if (n.duduk) n.makanSisa = 0.01; }, 4200 + i * 700));
     }, 1300);
   }
@@ -1684,7 +1766,23 @@ function rencanaJalan(N) {
 }
 const KATA_TABRAK = D.kataTabrak || ['Hati-hati kalau jalan! Pakai mata dong!'];
 const gelNpc = document.createElement('div'); gelNpc.id = 'gelembung-npc'; gelNpc.className = 'sembunyi'; $('hud').appendChild(gelNpc);
-let npcBicara = null, npcBicaraT = 0, tegurJeda = 0;
+let npcBicara = null, npcBicaraT = 0, tegurJeda = 0, npcKonteks = '', npcTerakhir = 0;
+// balas dengan mengetik: tulisanmu muncul di atas kepala si cewek
+const gelKamu = document.createElement('div'); gelKamu.id = 'gelembung-kamu'; gelKamu.className = 'sembunyi'; $('hud').appendChild(gelKamu);
+let kamuBicaraT = 0;
+function bukaBalas() {
+  const N = npcBicara; if (!N) return;
+  const ctx = npcKonteks;
+  kartu('⌨️', 'Balas', '<input id="balas-teks" maxlength="120" placeholder="Ketik balasanmu…" autocomplete="off">', 'Kirim', () => {
+    const t = ($('balas-teks') && $('balas-teks').value || '').trim(); if (!t) return;
+    gelKamu.textContent = t; gelKamu.classList.remove('sembunyi'); kamuBicaraT = 4.5;
+    if (!N.duduk || N.pergi) N.yaw = Math.atan2(-(player.x - N.x), -(player.z - N.z));
+    const B = D.balasanNpc || {}; const r = B[ctx] || B._;
+    if (r && r.length) setTimeout(() => { npcBicara = N; npcBicaraT = 2.8; gelNpc.textContent = pick(r); gelNpc.classList.remove('sembunyi'); }, 1800);
+  });
+  setTimeout(() => { const i = $('balas-teks'); if (i) { i.focus(); i.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') $('k-aksi').onclick(); }; i.onkeyup = e => e.stopPropagation(); } }, 50);
+}
+$('btn-balas').onclick = bukaBalas;
 function tabrakNpc(mx, mz) {
   for (const N of npcs) {
     if (N.local || N.pelayan || N.tunda > 0 || N.vis === false || !N.P.group.visible) continue;
@@ -1699,7 +1797,7 @@ function tabrakNpc(mx, mz) {
 function tegur(N) {
   N.tegurT = performance.now(); tegurJeda = 3;
   if (!N.duduk) { N.marah = 4; N.diamT = 0; }
-  npcBicara = N; npcBicaraT = 2.8;
+  npcBicara = N; npcBicaraT = 2.8; npcKonteks = 'tegur';
   gelNpc.textContent = pick(KATA_TABRAK); gelNpc.classList.remove('sembunyi');
   setTimeout(() => bicara(pick(D.maafPasangan || ['Maaf ya, nggak sengaja.']), 3), 3000);
 }
@@ -1720,14 +1818,14 @@ function updateNumpang(dt) {
     if (!duduk || duduk.meja !== m) { NUMPANG.N = null; duduki(); return; }
     N.yaw = Math.atan2(-(player.x - N.x), -(player.z - N.z));
     const tanya = pick(D.tanyaNumpang || ['Permisi, apakah boleh duduk di sini?']);
-    npcBicara = N; npcBicaraT = 99; gelNpc.textContent = tanya; gelNpc.classList.remove('sembunyi');
+    npcBicara = N; npcBicaraT = 99; npcKonteks = 'numpang'; gelNpc.textContent = tanya; gelNpc.classList.remove('sembunyi');
     kartu('🙋', 'Pengunjung bertanya', `<p style="text-align:center;font-size:17px">"${tanya}"</p>`, 'Boleh 😊', () => {
-      NUMPANG.N = null; npcBicaraT = 2.5; gelNpc.textContent = pick(D.jawabBoleh || ['Terima kasih ya!']); duduki();
+      NUMPANG.N = null; npcBicaraT = 2.5; npcKonteks = 'boleh'; gelNpc.textContent = pick(D.jawabBoleh || ['Terima kasih ya!']); duduki();
     });
     $('k-tutup').textContent = 'Tidak';
     kartuTidak = () => {
       NUMPANG.N = null; k.n = null; N.kursiFC = null;
-      npcBicaraT = 3; gelNpc.textContent = pick(D.jawabPelit || ['Dasar pelit!']);
+      npcBicaraT = 3; npcKonteks = 'pelit'; gelNpc.textContent = pick(D.jawabPelit || ['Dasar pelit!']);
       N.diamT = 1.2; N.jalur = [[lorong, k.z - 1.0], [lorong, 77.2], FC_PINTU, [rand(40, 85), 88]]; N.pergi = true;
       setTimeout(() => bicara(pick(D.setelahPelit || ['Biarin aja, kita lagi pengin berdua kan.']), 3), 3200);
     };
@@ -1736,6 +1834,15 @@ function updateNumpang(dt) {
 function updateTegur(dt) {
   updateNumpang(dt);
   if (tegurJeda > 0) tegurJeda -= dt;
+  if (npcBicaraT > 0 && npcBicaraT < 90) npcTerakhir = performance.now();
+  const bisaBalas = npcBicara && !paused && performance.now() - npcTerakhir < 7000 && Math.hypot(npcBicara.x - player.x, npcBicara.z - player.z) < 9 && npcs.includes(npcBicara);
+  $('btn-balas').classList.toggle('sembunyi', !bisaBalas);
+  if (kamuBicaraT > 0) {
+    kamuBicaraT -= dt;
+    tmpA.set(player.x, kamu.group.position.y + 1.95, player.z).project(camera);
+    if (tmpA.z < 1) { const hw = gelKamu.offsetWidth / 2 + 8; gelKamu.style.left = clamp((tmpA.x + 1) / 2 * innerWidth, hw, innerWidth - hw) + 'px'; gelKamu.style.top = clamp((1 - tmpA.y) / 2 * innerHeight, 80, innerHeight - 40) + 'px'; }
+    if (kamuBicaraT <= 0) gelKamu.classList.add('sembunyi');
+  }
   if (npcBicaraT > 0) {
     npcBicaraT -= dt;
     const N = npcBicara;
@@ -2590,4 +2697,4 @@ function frame() {
 // intro: kamera memutar perlahan di layar mulai
 camYaw = 0;
 frame();
-window.__safari = { NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };

@@ -8,9 +8,11 @@ window.SAFARI = {
   // Obrolan AI: berapa pesan terakhir yang dikirim ke AI berikutnya (hemat kuota)
   riwayatAI: 3,
 
-  // Waktu: jam saat mulai (0-23) dan berapa menit nyata untuk 1 jam di game
-  jamMulai: 9,
-  menitPerJam: 1,
+  // Waktu taman ikut jam dunia nyata (sama untuk semua orang): 1 hari di taman = 60 menit nyata
+  menitPerHari: 60,
+  // Uang jajan berdua per hari (rupiah), kembali penuh setiap jam berikut (waktu taman)
+  uangHarian: 200000,
+  jamReset: 7,
 
   // Topi saat siang terik
   tanyaTopi: 'Kamu pasti merasa panas kan? Ingin mengenakan topi?',
@@ -47,6 +49,16 @@ window.SAFARI = {
   setelahPelit: ['Biarin aja, kita lagi pengin berdua kan.'],
   // Kalau kalian duduk di meja yang sudah ada orangnya, dia mengeluh lalu pergi
   keluhDuduk: ['Ini orang siapa sih? Main duduk aja, nggak permisi! Nggak sopan banget.'],
+
+  // Jawaban orang lain setelah kamu mengetik balasan (⌨️ Balas)
+  balasanNpc: {
+    tegur: ['Ya sudah, lain kali hati-hati!', 'Hmm, iya deh.'],
+    keluh: ['Ya sudah, aku pindah aja.', 'Huh!'],
+    pelit: ['Bodo amat!', 'Hmph!'],
+    boleh: ['Iya, sama-sama.', 'Makasih ya, Kak.'],
+    pelayan: ['Sama-sama, Kak!', 'Siap, Kak. Selamat makan!'],
+    _: ['Oh, iya.', 'Hmm.']
+  },
 
   // Komentar pasangan saat pertama kali masuk sebuah area
   komentarZona: {
