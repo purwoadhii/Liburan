@@ -2945,7 +2945,7 @@ const LIHAT = { x: 0, y: 0, tahan: null };
   m.addEventListener('pointermove', e => {
     const t = LIHAT.tahan; if (!t || t.id !== e.pointerId) return;
     const dx = e.clientX - t.x, dy = e.clientY - t.y; t.x = e.clientX; t.y = e.clientY;
-    LIHAT.x = clamp(LIHAT.x - dx * 0.008, -2.7, 2.7); LIHAT.y = clamp(LIHAT.y + dy * 0.006, -0.8, 0.8);
+    LIHAT.x = clamp(LIHAT.x - dx * 0.014, -2.7, 2.7); LIHAT.y = clamp(LIHAT.y + dy * 0.008, -0.8, 0.8);
   });
   const lepas = e => { if (LIHAT.tahan && LIHAT.tahan.id === e.pointerId) { LIHAT.tahan = null; m.classList.remove('aktif'); } };
   m.addEventListener('pointerup', lepas); m.addEventListener('pointercancel', lepas);
