@@ -347,6 +347,9 @@ enclosureRect('panda', -55, -186, 26, 20, { tanah: '#cfe5a6' });
 // pagar keliling taman: hanya bisa masuk lewat gerbang
 fencePath([[-2, 90], [-2, 100], [BATAS.x1 + 1, 100], [BATAS.x1 + 1, BATAS.z1 + 1], [BATAS.x2 - 1, BATAS.z1 + 1], [BATAS.x2 - 1, 90], [37.4, 90]], [], 'tinggi');
 fencePath([[-2, 90], [22.6, 90]], [], 'tinggi');
+// pagar area air terjun, gerbang di ujung jalan utama (x=0, z=-188)
+fencePath([[-4.5, -188], [-36, -188], [-36, -226]], [], 'kayu');
+fencePath([[4.5, -188], [36, -188], [36, -226]], [], 'kayu');
 { // instanced posts & rails
   const pl = posts.filter(p => !p[2]), ph = posts.filter(p => p[2]);
   const im1 = new THREE.InstancedMesh(postGeo, mat('#7a5634'), pl.length);
@@ -1734,7 +1737,7 @@ function updateGedung(dt, t, dalam) {
   if (BIOS.status === 'masuk') { BIOS.timer -= dt; if (BIOS.timer <= 0 || (BIOS.timer < 14 && BIOS.penonton.every(n => n.duduk))) putarFilm(); }
   // penonton & pengunjung
   for (let i = npcs.length - 1; i >= 0; i--) {
-    const N = npcs[i]; if (N.local) { continue; }
+    const N = npcs[i]; if (N.local || N.kendali) { continue; }
     if (N.vis === false && !N.pelayan && !N.bioskop) { N.P.group.visible = false; continue; }
     if (N.tunda > 0) { N.tunda -= dt; N.P.group.visible = false; continue; }
     N.P.group.visible = N.vis !== false;
@@ -2585,6 +2588,91 @@ function animPerson(P, phase, amt) {
 }
 
 let nearest = null, zonaSekarang = '', kicauT = 3;
+/* ---------- air terjun: hanya buka malam (jam 21-02), dijaga satpam ---------- */
+const JAM_BUKA_AT = D.jamBukaAirTerjun != null ? D.jamBukaAirTerjun : 21, JAM_TUTUP_AT = D.jamTutupAirTerjun != null ? D.jamTutupAirTerjun : 2;
+const atBuka = (h = WAKTU.jam) => JAM_BUKA_AT > JAM_TUTUP_AT ? (h >= JAM_BUKA_AT || h < JAM_TUTUP_AT) : (h >= JAM_BUKA_AT && h < JAM_TUTUP_AT);
+const diAreaAT = (x = player.x, z = player.z) => z < -188.6 && Math.abs(x) < 36;
+const jamBukaTeks = () => String(JAM_BUKA_AT).padStart(2, '0') + '.00–' + String(JAM_TUTUP_AT).padStart(2, '0') + '.00';
+const POS_SATPAM = [5.6, -186.4];
+const USIR = { fase: null, t: 0, dorong: false, tanyaT: -1e9 };
+const GERBANG_AT = (() => {
+  const g = new THREE.Group(); g.position.set(0, 0, -188); scene.add(g);
+  for (const sx of [-4.5, 4.5]) { mesh(box(0.5, 2.6, 0.5), '#6b5a48', sx, 1.3, 0, g); mesh(box(0.65, 0.2, 0.65), '#4a3d30', sx, 2.7, 0, g, false); }
+  const papan = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.1), new THREE.MeshLambertMaterial({ map: textTex(['💦 AIR TERJUN', 'Buka ' + jamBukaTeks()], { w: 640, h: 154, size: 56, size2: 36, bg: '#2f3a4f', border: '#f2d14b' }), emissive: '#333' }));
+  papan.position.set(0, 3.3, 0.05); g.add(papan); const pb = papan.clone(); pb.rotation.y = Math.PI; pb.position.z = -0.05; g.add(pb);
+  mesh(box(9.6, 0.15, 0.15), '#4a3d30', 0, 2.75, 0, g, false);
+  const palang = new THREE.Group(); palang.position.set(-4.1, 1.05, 0.35); g.add(palang);
+  for (let i = 0; i < 8; i++) mesh(box(1.03, 0.16, 0.1), i % 2 ? '#ffffff' : '#d23a3a', 0.52 + i * 1.03, 0, 0, palang, false);
+  const tutup = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), new THREE.MeshLambertMaterial({ map: textTex(['TUTUP'], { w: 256, h: 80, size: 52, bg: '#d23a3a', border: '#ffffff' }) }));
+  tutup.position.set(4.1, -0.35, 0.07); palang.add(tutup);
+  // pos satpam
+  const pos = new THREE.Group(); pos.position.set(8.5, 0, -185.5); scene.add(pos);
+  mesh(box(2.2, 2.4, 2), '#d9cdb6', 0, 1.2, 0, pos); mesh(box(2.6, 0.15, 2.4), '#5c4a3a', 0, 2.48, 0, pos, false);
+  mesh(box(1.2, 0.6, 0.05), '#a9d3e0', 0, 1.5, 1.01, pos, false);
+  addCircle(8.5, -185.5, 1.4);
+  return { g, palang };
+})();
+let SATPAM = null;
+setTimeout(() => {
+  SATPAM = buatNpc(POS_SATPAM, { cewek: false, baju: '#25324a', celana: '#1f2430', rambut: '#1a1a1a' });
+  SATPAM.kendali = true; SATPAM.yaw = 0;
+  const kepala = SATPAM.P.headParts[0];
+  mesh(cyl(0.17, 0.18, 0.1, 10), '#1f2a3d', 0, 0.2, 0, kepala, false); mesh(box(0.26, 0.03, 0.16), '#1f2a3d', 0, 0.16, 0.16, kepala, false);
+  const lencana = mesh(box(0.08, 0.1, 0.02), '#f2d14b', 0.12, 1.25, 0.2, SATPAM.P.group, false);
+}, 0);
+function satpamBicara(t, s = 3.5) { if (!SATPAM) return; npcBicara = SATPAM; npcBicaraT = s; npcKonteks = 'satpam'; gelNpc.textContent = t; gelNpc.classList.remove('sembunyi'); }
+function cekAirTerjun(zLama) {
+  if (atBuka() || player.z >= -188.4 || zLama < -188.4 || Math.abs(player.x) > 4.6) return;
+  player.z = -188.4;
+  if (performance.now() - USIR.tanyaT < 5000) return;
+  USIR.tanyaT = performance.now();
+  satpamBicara(pick(D.satpamBelumBuka || ['Maaf, Kak, area air terjun belum buka. Buka jam 9 malam ya.']));
+  hint('Area air terjun hanya buka jam ' + jamBukaTeks() + ' (waktu taman).', 3500);
+  setTimeout(() => bicara(pick(D.pasanganAirTerjun || ['Katanya ada sesuatu di sini kalau malam. Nanti malam kita ke sini ya.']), 4), 2600);
+}
+const _usirTujuan = [0, -184.5];
+function updateUsir(dt, t) {
+  if (!SATPAM) return;
+  const N = SATPAM, buka = atBuka();
+  GERBANG_AT.palang.rotation.z = lerp(GERBANG_AT.palang.rotation.z, buka ? 1.45 : 0, Math.min(1, dt * 2));
+  N.P.group.visible = Math.hypot(N.x - player.x, N.z - player.z) < 90;
+  let jalan = false, tx = POS_SATPAM[0], tz = POS_SATPAM[1], sp = 1.6;
+  const dalam = diAreaAT() && !NAIK;
+  if (!buka && dalam && !USIR.fase) { USIR.fase = 'datang'; USIR.t = 0; }
+  if (USIR.fase === 'datang') {
+    tx = player.x + 0.9; tz = player.z + 1.4; sp = 2.4;
+    if (Math.hypot(tx - N.x, tz - N.z) < 0.4) { USIR.fase = 'tegur'; USIR.t = D.waktuKeluarAirTerjun || 20; satpamBicara(pick(D.satpamTutup || ['Permisi, Kak. Area air terjun sudah tutup. Silakan keluar ya.']), 4); hint(`Area air terjun sudah tutup. Keluar dalam ${USIR.t} detik ya.`, 3500); setTimeout(() => bicara('Yah, sudah tutup. Yuk keluar, sayang.', 3), 3000); }
+  }
+  if (USIR.fase === 'tegur') {
+    tx = N.x; tz = N.z;
+    N.yaw += angDiff(N.yaw, Math.atan2(-(player.x - N.x), -(player.z - N.z))) * Math.min(1, dt * 5);
+    if (!dalam) { USIR.fase = 'pulang'; satpamBicara(pick(D.satpamTerimaKasih || ['Terima kasih, Kak. Buka lagi jam 9 malam.']), 3); }
+    else { USIR.t -= dt; if (USIR.t <= 0) { USIR.fase = 'dorong'; USIR.dorong = true; satpamBicara(pick(D.satpamDorong || ['Maaf ya, Kak, saya bantu keluar. Sudah tutup!']), 4); setTimeout(() => bicara('Iya, iya, Pak. Kami keluar…', 3), 1500); } }
+  }
+  if (USIR.fase === 'dorong') {
+    // pemain didorong pelan ke luar gerbang, satpam di belakang dengan tangan ke depan
+    const dx = _usirTujuan[0] - player.x, dz = _usirTujuan[1] - player.z, d = Math.hypot(dx, dz);
+    const st = Math.min(d, 1.5 * dt);
+    if (d > 0.1) { player.x += dx / d * st; player.z += dz / d * st; }
+    const arah = Math.atan2(-dx, -dz); player.yaw = arah; camYaw += angDiff(camYaw, arah) * Math.min(1, dt * 3);
+    player.speed = d > 0.1 ? 1.5 : 0;
+    tx = player.x - dx / (d || 1) * 0.75; tz = player.z - dz / (d || 1) * 0.75;
+    N.x = lerp(N.x, tx, Math.min(1, dt * 6)); N.z = lerp(N.z, tz, Math.min(1, dt * 6)); N.yaw = arah;
+    N.phase += dt * 4; animPerson(N.P, N.phase, 0.7); for (const a of N.P.arms) swingArm(a, -1.45, 1);
+    N.P.group.position.set(N.x, 0, N.z); N.P.group.rotation.y = N.yaw;
+    if (d < 0.15) { USIR.fase = 'pulang'; USIR.dorong = false; satpamBicara(pick(D.satpamTerimaKasih || ['Terima kasih, Kak. Buka lagi jam 9 malam.']), 3); }
+    return;
+  }
+  const dx = tx - N.x, dz = tz - N.z, d = Math.hypot(dx, dz);
+  if (d > 0.15) { const st = Math.min(d, sp * dt); N.x += dx / d * st; N.z += dz / d * st; N.yaw += angDiff(N.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8); jalan = true; }
+  else if (USIR.fase === 'pulang') { USIR.fase = null; }
+  else if (!USIR.fase) N.yaw += angDiff(N.yaw, 0) * Math.min(1, dt * 3);
+  N.phase += jalan ? dt * sp * 2.6 : 0;
+  animPerson(N.P, N.phase, jalan ? 0.8 : 0);
+  if (USIR.fase === 'tegur') { swingArm(N.P.arms[0], 0, 1); swingArm(N.P.arms[1], -1.2 + Math.sin(t * 3) * 0.3, -1); }
+  else for (const [k, a] of N.P.arms.entries()) swingArm(a, (k ? -1 : 1) * Math.sin(N.phase) * 0.5 * (jalan ? 1 : 0), k ? -1 : 1);
+  N.P.group.position.set(N.x, 0, N.z); N.P.group.rotation.y = N.yaw;
+}
 // tombol mata (seperti free look): tahan & geser untuk menoleh tanpa berbelok, dilepas kembali ke depan
 const LIHAT = { x: 0, y: 0, tahan: null };
 {
@@ -2761,7 +2849,7 @@ function update(dt, t) {
   if (keys.KeyW || keys.ArrowUp) jy = 1; if (keys.KeyS || keys.ArrowDown) jy = -1;
   if (keys.KeyA || keys.ArrowLeft) jx = -1; if (keys.KeyD || keys.ArrowRight) jx = 1;
   let mag = Math.min(1, Math.hypot(jx, jy));
-  if (paused || !started || duduk || antriPemain || TOPI.anim || AMATI.aktif) { jx = jy = 0; mag = 0; }
+  if (paused || !started || duduk || antriPemain || TOPI.anim || AMATI.aktif || USIR.dorong) { jx = jy = 0; mag = 0; }
   // kiri-kanan = berbelok (memutar arah), maju-mundur = jalan
   const belok = Math.abs(jx) < 0.12 ? 0 : jx;
   camYaw -= belok * 2.1 * dt;
@@ -2783,7 +2871,7 @@ function update(dt, t) {
     const p = { x: player.x, z: player.z }; resolve(p, 0.38); player.x = p.x; player.z = p.z;
     tabrakNpc(mx, mz);
   }
-  cekGerbang(zSebelum);
+  cekGerbang(zSebelum); cekAirTerjun(zSebelum);
   const spdAntri = antriPemain ? gerakAntri(dt) : 0;
   player.speed = lerp(player.speed, Math.max(spd, spdAntri), Math.min(1, dt * 8));
   const targetT = mode === 'tpp' ? 1 : 0;
@@ -2868,7 +2956,7 @@ function update(dt, t) {
   // hewan
   for (const A of animals) if (A.group.visible) updateAnimal(A, dt, t);
   updateBurung(dt, t);
-  updateGedung(dt, t, dalam); updateAntrian(dt); updateTegur(dt); if (started) updateWaktu(dt, dalam);
+  updateGedung(dt, t, dalam); updateUsir(dt, t); updateAntrian(dt); updateTegur(dt); if (started) updateWaktu(dt, dalam);
   for (const f of putar) f(dt, t);
   if (airTerjunMesh) airTerjunMesh.material.map.offset.y += dt * 1.2;
   tAir.offset.x += dt * 0.01; tAir.offset.y += dt * 0.006;
@@ -2984,4 +3072,4 @@ function frame() {
 // intro: kamera memutar perlahan di layar mulai
 camYaw = 0;
 frame();
-window.__safari = { JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };

@@ -20,6 +20,17 @@ window.SAFARI = {
   tiketBioskop: 20000,         // per orang
   hargaPopcorn: 25000,
   hargaMinumBioskop: 15000,
+  // Air terjun hanya buka malam (jam taman). Setelah tutup, satpam meminta keluar; kalau tidak keluar dalam
+  // waktuKeluarAirTerjun detik, satpam mendorong kalian keluar.
+  jamBukaAirTerjun: 21,
+  jamTutupAirTerjun: 2,
+  waktuKeluarAirTerjun: 20,
+  satpamBelumBuka: ['Maaf, Kak, area air terjun belum buka. Buka jam 9 malam ya.'],
+  satpamTutup: ['Permisi, Kak. Area air terjun sudah tutup. Silakan keluar ya.'],
+  satpamDorong: ['Maaf ya, Kak, saya bantu keluar. Sudah tutup!'],
+  satpamTerimaKasih: ['Terima kasih, Kak. Buka lagi jam 9 malam.'],
+  pasanganAirTerjun: ['Katanya ada sesuatu di sini kalau malam. Nanti malam kita ke sini ya.'],
+
   // Jip safari (3 mobil): harga per orang, lama 1 putaran dalam menit taman (jarak antar jip = putaran / 3),
   // lama berhenti di tiap halte dalam menit taman. 1 menit taman = 2,5 detik nyata.
   hargaJip: 10000,
@@ -78,6 +89,7 @@ window.SAFARI = {
     pelit: ['Bodo amat!', 'Hmph!'],
     boleh: ['Iya, sama-sama.', 'Makasih ya, Kak.'],
     pelayan: ['Sama-sama, Kak!', 'Siap, Kak. Selamat makan!'],
+    satpam: ['Iya, Kak. Aturannya memang begitu.', 'Maaf ya, Kak, saya cuma menjalankan tugas.'],
     _: ['Oh, iya.', 'Hmm.']
   },
 
