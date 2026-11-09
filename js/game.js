@@ -2294,7 +2294,7 @@ $('btn-mulai').onclick = () => {
   setModeLabel();
   $('mulai').classList.add('sembunyi'); $('hud').classList.remove('sembunyi');
   started = true; initAudio();
-  hint('Geser lingkaran kiri bawah untuk jalan · geser layar untuk melihat · ketuk hewan untuk info', 5200);
+  hint('Joystick: atas maju, kiri-kanan belok · geser layar untuk melihat · ketuk hewan untuk info', 5200);
   setTimeout(() => bicara((D.komentarZona || {}).parkir || 'Yuk jalan!'), 1200);
   visited.add('parkir');
 };
@@ -2325,10 +2325,15 @@ function update(dt, t) {
   if (keys.KeyA || keys.ArrowLeft) jx = -1; if (keys.KeyD || keys.ArrowRight) jx = 1;
   let mag = Math.min(1, Math.hypot(jx, jy));
   if (paused || !started || duduk || antriPemain || TOPI.anim || AMATI.aktif) { jx = jy = 0; mag = 0; }
-  const fwdX = -Math.sin(camYaw), fwdZ = -Math.cos(camYaw), rtX = Math.cos(camYaw), rtZ = -Math.sin(camYaw);
-  let mx = fwdX * jy + rtX * jx, mz = fwdZ * jy + rtZ * jx; const ml = Math.hypot(mx, mz);
+  // kiri-kanan = berbelok (memutar arah), maju-mundur = jalan
+  const belok = Math.abs(jx) < 0.12 ? 0 : jx;
+  camYaw -= belok * 2.1 * dt;
+  const maju = Math.abs(jy) < 0.12 ? 0 : jy;
+  mag = Math.min(1, Math.abs(maju));
+  const fwdX = -Math.sin(camYaw), fwdZ = -Math.cos(camYaw);
+  let mx = fwdX * maju, mz = fwdZ * maju; const ml = Math.hypot(mx, mz);
   const run = keys.ShiftLeft || keys.ShiftRight;
-  const spd = (run ? 6.5 : 4.2) * mag;
+  const spd = (run ? 6.5 : 4.2) * mag * (maju < 0 ? 0.6 : 1);
   if (ml > 0.01) {
     mx /= ml; mz /= ml;
     player.x += mx * spd * dt; player.z += mz * spd * dt;
@@ -2344,7 +2349,7 @@ function update(dt, t) {
   if (antriPemain) {}
   else if (AMATI.suap) { const A = AMATI.suap.A; const want = Math.atan2(-(A.group.position.x - player.x), -(A.group.position.z - player.z)); player.yaw += angDiff(player.yaw, want) * Math.min(1, dt * 4); camYaw = player.yaw; }
   else if (modeT < 0.5 || mode === 'fpp') player.yaw += angDiff(player.yaw, camYaw) * Math.min(1, dt * 10);
-  else if (ml > 0.01) player.yaw += angDiff(player.yaw, Math.atan2(-mx, -mz)) * Math.min(1, dt * 7);
+  else if (ml > 0.01 || belok) player.yaw += angDiff(player.yaw, camYaw) * Math.min(1, dt * 7);
   player.phase += player.speed * dt * 2.6;
 
   kamu.group.position.set(player.x, kamu.group.position.y, player.z);
