@@ -65,6 +65,7 @@ h2{margin:4px 0 8px;color:var(--hijau)}
 #peta-kanvas{width:100%;height:auto;border-radius:14px;display:block;background:#7fb069}
 #foto-img{width:100%;border-radius:14px;display:block}
 
+#btn-makan{background:var(--aksen);color:#fff;padding:12px 20px;border-radius:999px;font-size:16px;font-weight:500;box-shadow:var(--bayang)}
 #btn-berdiri{background:#fffaf0;color:var(--teks);padding:11px 18px;border-radius:999px;font-size:15px;font-weight:500;box-shadow:var(--bayang)}
 .menu{display:flex;flex-direction:column;gap:8px;margin:6px 0}
 .menu-item{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid #e6e1d4;border-radius:14px;padding:10px 12px;cursor:pointer}

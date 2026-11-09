@@ -816,9 +816,9 @@ const WARNA_BAJU = ['#5aa7dc', '#e8836f', '#6aa64e', '#f2d14b', '#d98ad6', '#fff
 const WARNA_CELANA = ['#2f3a4f', '#3b3b46', '#c9b28a', '#5a4a3a', '#7d8a99'];
 const WARNA_RAMBUT = ['#221712', '#3b2417', '#1a1a1a', '#5a3b2a'];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
-function buatNpc(posisi) {
-  const cewek = Math.random() < 0.5;
-  const P = makePerson(cewek, { npc: true, baju: pick(WARNA_BAJU), celana: cewek ? (Math.random() < 0.5 ? null : pick(WARNA_CELANA)) : pick(WARNA_CELANA), rambut: pick(WARNA_RAMBUT), kulit: pick(['#f1c7a5', '#d9a57d', '#c68e64', '#e8b98f']) });
+function buatNpc(posisi, opsi = {}) {
+  const cewek = opsi.cewek != null ? opsi.cewek : Math.random() < 0.5;
+  const P = makePerson(cewek, { npc: true, ...opsi, baju: opsi.baju || pick(WARNA_BAJU), celana: opsi.celana || (cewek ? (Math.random() < 0.5 ? null : pick(WARNA_CELANA)) : pick(WARNA_CELANA)), rambut: pick(WARNA_RAMBUT), kulit: pick(['#f1c7a5', '#d9a57d', '#c68e64', '#e8b98f']) });
   P.group.position.set(posisi[0], 0, posisi[1]);
   for (const a of P.arms) swingArm(a, 0, 1);
   const N = { P, x: posisi[0], z: posisi[1], yaw: 0, jalur: [], phase: Math.random() * 6, duduk: false, speed: rand(1.1, 1.5) };
@@ -906,7 +906,7 @@ let pesanan = [];
     const c = Math.cos(r), sn = Math.sin(r);
     const wp = (lx, lz) => [x + lx * c + lz * sn, z - lx * sn + lz * c];
     const a = wp(-1.75, 1.3), b = wp(1.75, 1.3); addSeg(a[0], a[1], b[0], b[1]);
-    const it = addInteract(g, 'kios', i, 3.6); it.label = 'Pesan di ' + k.nama; it.pusat = wp(0, 1.8);
+    const it = addInteract(g, 'kios', i, 3.6); it.label = 'Pesan di ' + k.nama; it.pusat = wp(0, 1.8); k.depan = wp(0, 2.1);
   });
   // meja
   for (const tx of [43.5, 50, 56.5]) for (const tz of [65.5, 70, 74.5]) {
@@ -986,11 +986,11 @@ function bukaKios(i) {
     const dipilih = [];
     document.querySelectorAll('#k-isi .menu-item').forEach(r => { const n = +r.querySelector('.jml').textContent; for (let q = 0; q < n; q++) dipilih.push(k.menu[+r.dataset.j]); });
     if (!dipilih.length) { hint('Belum ada menu yang dipilih.'); return; }
-    for (const m of dipilih) pesanan.push({ nama: m[0], emoji: k.emoji, warna: k.warna });
+    for (const m of dipilih) pesanan.push({ nama: m[0], emoji: k.emoji, warna: k.warna, kios: i, minum: /^(Es |Jus|Teh|Kopi|Cappuccino|Coklat Panas|Ocha|Smoothie)/.test(m[0]), diantar: false, dikirim: false, sisa: 1 });
     pesanan = pesanan.slice(-9);
     const ringkas = {}; dipilih.forEach(m => ringkas[m[0]] = (ringkas[m[0]] || 0) + 1);
     hint(`Pesanan dicatat: ${Object.entries(ringkas).map(([n, q]) => q + '× ' + n).join(', ')}. Yuk cari meja!`, 3500);
-    if (duduk && duduk.meja) taruhMakanan(duduk.meja);
+    if (duduk && duduk.meja) kirimPelayan(duduk.meja);
     else bicara(pick(['Wah, kelihatannya enak!', 'Aku juga lapar nih.', 'Pilihan bagus, sayang.']));
   });
   $('k-aksi').textContent = 'Pesan';
@@ -1002,26 +1002,102 @@ function bukaKios(i) {
     $('total').textContent = rupiah(tot).replace('Rp0.000', 'Rp0');
   };
 }
+function modelHidangan(p, parent) {
+  const g = new THREE.Group(); parent.add(g);
+  if (p.minum) {
+    mesh(cyl(0.065, 0.055, 0.2, 10), new THREE.MeshLambertMaterial({ color: '#dff2f7', transparent: true, opacity: 0.55 }), 0, 0.1, 0, g, false);
+    p.isi = mesh(cyl(0.058, 0.05, 0.16, 10), p.warna, 0, 0.085, 0, g, false);
+    mesh(cyl(0.008, 0.008, 0.26, 4), '#ffffff', 0.02, 0.2, 0, g, false).rotation.z = 0.2;
+  } else {
+    mesh(cyl(0.17, 0.12, 0.1, 10), '#f8f4ea', 0, 0.05, 0, g, false);
+    p.isi = mesh(cyl(0.14, 0.14, 0.04, 10), p.warna, 0, 0.1, 0, g, false);
+  }
+  return g;
+}
 function taruhMakanan(m) {
   for (const o of m.makanan) scene.remove(o);
   m.makanan = [];
-  pesanan.forEach((p, i) => {
+  pesanan.filter(p => p.diantar && p.meja === m).forEach((p, i) => {
     const g = new THREE.Group(); g.position.set(m.x - 0.6 + (i % 3) * 0.6, 0.8, m.z + 0.3 - Math.floor(i / 3) * 0.3); scene.add(g);
-    mesh(cyl(0.17, 0.12, 0.1, 10), '#f8f4ea', 0, 0.05, 0, g, false);
-    mesh(cyl(0.14, 0.14, 0.03, 10), p.warna, 0, 0.1, 0, g, false);
+    modelHidangan(p, g);
+    aturSisa(p);
     m.makanan.push(g);
   });
+  tampilMakan();
+}
+function aturSisa(p) { if (!p.isi) return; p.isi.scale.y = Math.max(0.02, p.sisa); p.isi.visible = p.sisa > 0.02; if (p.minum) p.isi.position.y = 0.005 + 0.08 * p.sisa; }
+function tampilMakan() {
+  const ada = duduk && duduk.meja && pesanan.some(p => p.diantar && p.meja === duduk.meja && p.sisa > 0.02);
+  $('btn-makan').classList.toggle('sembunyi', !ada || !!(duduk && duduk.makanT > 0));
+}
+let pelayanAktif = 0;
+function kirimPelayan(m) {
+  const per = {};
+  pesanan.filter(p => !p.dikirim).forEach(p => { p.dikirim = true; p.meja = m; (per[p.kios] = per[p.kios] || []).push(p); });
+  const grup = Object.entries(per);
+  if (!grup.length) return;
+  hint('Pesanan sedang disiapkan, sebentar lagi diantar 🍽️', 3000);
+  grup.forEach(([ki, items], n) => {
+    const k = KIOS[+ki];
+    const N = buatNpc(k.depan, { baju: '#f8f4ea', celana: '#26262b', rambut: '#1a1a1a' });
+    N.x = k.depan[0]; N.z = k.depan[1]; N.speed = 1.5; N.pelayan = true; N.tunda = 2.5 + n * 1.8;
+    const baki = new THREE.Group(); baki.position.set(0, 1.02, 0.42); N.P.group.add(baki);
+    mesh(box(0.55, 0.03, 0.38), '#6b4a2b', 0, 0, 0, baki, false);
+    items.slice(0, 4).forEach((p, j) => { const h = modelHidangan({ ...p }, baki); h.position.set(-0.15 + (j % 2) * 0.3, 0.02, -0.08 + Math.floor(j / 2) * 0.16); h.scale.setScalar(0.8); });
+    const sisi = n % 2 ? -1 : 1;
+    N.jalur = [[m.x + sisi * 1.45, m.z + 1.9], [m.x + sisi * 1.4, m.z + 0.35]];
+    pelayanAktif++;
+    N.onArrive = () => {
+      N.yaw = sisi > 0 ? Math.PI / 2 : -Math.PI / 2; N.diamT = 1.2;
+      setTimeout(() => {
+        items.forEach(p => p.diantar = true); N.P.group.remove(baki); N.bawa = false;
+        taruhMakanan(m);
+        npcBicara = N; npcBicaraT = 2.6; gelNpc.textContent = pick(['Silakan, selamat menikmati!', 'Pesanannya sudah datang, selamat makan!', 'Ini pesanannya ya, Kak.']); gelNpc.classList.remove('sembunyi');
+        if (duduk && duduk.meja === m) hint('Makanan datang! Ketuk 🍽️ Makan', 3000);
+        N.jalur = [[m.x + sisi * 1.45, m.z + 1.9], k.depan]; N.pergi = true; pelayanAktif--;
+      }, 1200);
+    };
+    N.bawa = true;
+  });
+}
+function mulaiMakan() {
+  if (!duduk || !duduk.meja) return;
+  duduk.makanT = 7; duduk.fase = 0;
+  $('btn-makan').classList.add('sembunyi');
+  setTimeout(() => bicara(pick(['Enak banget! Mau coba punyaku?', 'Makan bareng kamu rasanya lebih enak.', 'Aaa… buka mulutnya, aku suapin.', 'Minumnya seger banget.'])), 1800);
+}
+function animMakan(dt) {
+  if (!duduk || !(duduk.makanT > 0)) return false;
+  duduk.makanT -= dt; duduk.fase += dt;
+  const items = pesanan.filter(p => p.diantar && p.meja === duduk.meja && p.sisa > 0.02);
+  for (const p of items) { p.sisa = Math.max(0, p.sisa - dt / 7); aturSisa(p); }
+  const ph = duduk.fase * 3.2;
+  const angkat = (x) => -1.2 - Math.max(0, Math.sin(x)) * 1.25;
+  swingArm(kamu.arms[1], angkat(ph), -1); swingArm(kamu.arms[0], -1.15, 1);
+  swingArm(dia.arms[0], angkat(ph + 1.9), 1); swingArm(dia.arms[1], -1.15, -1);
+  kamu.headParts[0].rotation.x = 0.15 + Math.max(0, Math.sin(ph - 0.4)) * 0.12;
+  dia.headParts[0].rotation.x = 0.15 + Math.max(0, Math.sin(ph + 1.5)) * 0.12;
+  if (Math.random() < dt * 0.8) { tmpB.set(player.x + 0.2, 1.5, player.z); hearts(tmpB, 1, pick(['😋', '💛', '🍴'])); }
+  if (duduk.makanT <= 0) {
+    kamu.headParts[0].rotation.x = dia.headParts[0].rotation.x = 0;
+    const habis = !pesanan.some(p => p.diantar && p.meja === duduk.meja && p.sisa > 0.02);
+    hint(habis ? 'Habis! Kenyang 😋' : 'Masih ada sisa. Ketuk 🍽️ Makan lagi kalau mau.', 2800);
+    if (habis) setTimeout(() => bicara(pick(['Kenyang banget. Makasih ya sudah nemenin makan.', 'Habis ini jalan lagi yuk, biar turun makanannya.'])), 600);
+    tampilMakan();
+  }
+  return true;
 }
 function dudukMeja(m) {
   duduk = { meja: m, a: [m.x - 0.45, m.z + 0.85], b: [m.x + 0.45, m.z + 0.85], yaw: 0, sejak: 0 };
-  if (pesanan.length) { taruhMakanan(m); hint('Selamat makan! 🍽️', 2500); setTimeout(() => bicara(pick(['Enak banget! Mau coba punyaku?', 'Makan bareng kamu rasanya lebih enak.', 'Habis ini kita jalan lagi ya.'])), 1500); }
-  else hint('Belum pesan makanan. Pilih kios dulu, nanti makanannya diantar ke sini.', 3500);
-  tampilBerdiri(true);
+  if (pesanan.some(p => !p.dikirim)) kirimPelayan(m);
+  else if (pesanan.some(p => p.meja === m)) taruhMakanan(m);
+  else hint('Belum pesan makanan. Pilih kios dulu, nanti pelayan mengantarnya ke meja ini.', 3500);
+  tampilBerdiri(true); tampilMakan();
 }
 function tampilBerdiri(on) { $('btn-berdiri').classList.toggle('sembunyi', !on); }
 function berdiri() {
   if (!duduk) return;
-  if (duduk.meja) { if (duduk.sejak > 6 && pesanan.length) { for (const o of duduk.meja.makanan) scene.remove(o); duduk.meja.makanan = []; pesanan = []; } player.x = duduk.meja.x; player.z = duduk.meja.z + 1.9; }
+  if (duduk.meja) { const mj = duduk.meja; if (pesanan.some(p => p.meja === mj && p.diantar)) { for (const o of mj.makanan) scene.remove(o); mj.makanan = []; pesanan = pesanan.filter(p => !(p.meja === mj && p.diantar)); } kamu.headParts[0].rotation.x = dia.headParts[0].rotation.x = 0; $('btn-makan').classList.add('sembunyi'); player.x = duduk.meja.x; player.z = duduk.meja.z + 1.9; }
   if (duduk.bioskop) { selesaiFilm(); player.x = 66.6; player.z = duduk.a[1]; }
   partner.x = player.x + 0.7; partner.z = player.z;
   duduk = null; tampilBerdiri(false);
@@ -1035,7 +1111,6 @@ function posisiDuduk() {
   kamu.group.position.set(player.x, 0.52 - kamu.hip + hh, player.z); dia.group.position.set(partner.x, 0.52 - dia.hip + hh, partner.z);
   kamu.group.rotation.y = dia.group.rotation.y = duduk.yaw + Math.PI;
   for (const P of [kamu, dia]) for (const l of P.legs) l.rotation.x = -1.45;
-  if (duduk.meja && duduk.meja.makanan.length && Math.random() < 0.01) { tmpB.set(player.x, 1.4, player.z); hearts(tmpB, 1, pick(['😋', '💛'])); }
 }
 
 /* ---------- film ---------- */
@@ -1144,6 +1219,7 @@ function updateGedung(dt, t, dalam) {
           N.jalur.shift();
           if (!N.jalur.length) {
             if (N.pergi) { scene.remove(N.P.group); npcs.splice(i, 1); continue; }
+            if (N.onArrive) { const f = N.onArrive; N.onArrive = null; f(N); }
             if (N.bioskop) { N.duduk = true; N.yaw = 0; }
           }
         } else {
@@ -1154,7 +1230,8 @@ function updateGedung(dt, t, dalam) {
       N.phase += moving ? dt * N.speed * 2.6 : 0;
       N.P.group.position.set(N.x, N.kursi && N.jalur.length <= 2 && !N.pergi ? N.kursi.h : (N.pergi && N.jalur.length >= 4 ? N.kursi.h : 0), N.z);
       animPerson(N.P, N.phase, moving ? 0.8 : 0);
-      swingArm(N.P.arms[0], -Math.sin(N.phase) * 0.4 * (moving ? 1 : 0), 1); swingArm(N.P.arms[1], Math.sin(N.phase) * 0.4 * (moving ? 1 : 0), -1);
+      if (N.bawa) { swingArm(N.P.arms[0], -1.25, 1); swingArm(N.P.arms[1], -1.25, -1); }
+      else { swingArm(N.P.arms[0], -Math.sin(N.phase) * 0.4 * (moving ? 1 : 0), 1); swingArm(N.P.arms[1], Math.sin(N.phase) * 0.4 * (moving ? 1 : 0), -1); }
     }
     N.P.group.rotation.y = N.yaw + Math.PI;
   }
@@ -1195,7 +1272,7 @@ const gelNpc = document.createElement('div'); gelNpc.id = 'gelembung-npc'; gelNp
 let npcBicara = null, npcBicaraT = 0, tegurJeda = 0;
 function tabrakNpc(mx, mz) {
   for (const N of npcs) {
-    if (N.local || N.tunda > 0 || N.vis === false || !N.P.group.visible) continue;
+    if (N.local || N.pelayan || N.tunda > 0 || N.vis === false || !N.P.group.visible) continue;
     const dx = N.x - player.x, dz = N.z - player.z, d = Math.hypot(dx, dz), r = N.duduk ? 0.62 : 0.68;
     if (d < r && d > 1e-4) {
       player.x = N.x - dx / d * r; player.z = N.z - dz / d * r;
@@ -1222,6 +1299,7 @@ function updateTegur(dt) {
   }
 }
 $('btn-berdiri').onclick = berdiri;
+$('btn-makan').onclick = mulaiMakan;
 $('btn-putar').onclick = () => { const v = BIOS.video; if (!v) return; if (v.paused) { v.play(); $('btn-putar').textContent = '⏸'; } else { v.pause(); $('btn-putar').textContent = '▶'; } };
 $('yt-tutup').onclick = () => berdiri();
 /* papan nama setiap area */
@@ -1572,7 +1650,7 @@ function update(dt, t) {
   hand.y = lerp(1.18, 0.86, e) + Math.sin(player.phase) * 0.02;
   if (duduk) {
     const lengan = duduk.meja ? -1.15 : -0.75;
-    swingArm(kamu.arms[0], lengan, 1); swingArm(kamu.arms[1], lengan, -1); swingArm(dia.arms[0], lengan, 1); swingArm(dia.arms[1], lengan, -1);
+    if (!animMakan(dt)) { swingArm(kamu.arms[0], lengan, 1); swingArm(kamu.arms[1], lengan, -1); swingArm(dia.arms[0], lengan, 1); swingArm(dia.arms[1], lengan, -1); }
   } else {
     aimArm(kamu, kamu.arms[0], hand); aimArm(dia, dia.arms[1], hand);
     swingArm(kamu.arms[1], -Math.sin(player.phase) * 0.5 * Math.min(1, player.speed / 3), 1);
