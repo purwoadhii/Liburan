@@ -85,3 +85,21 @@ h2{margin:4px 0 8px;color:var(--hijau)}
 #pratinjau{width:100%;height:auto;border-radius:14px;background:radial-gradient(circle,#fffaf0,#e9dcc0);display:block}
 .ket-hidangan{margin:8px 0;font-size:15px}
 #jam{position:absolute;left:max(12px,env(safe-area-inset-left));top:calc(max(12px,env(safe-area-inset-top)) + 44px);background:var(--kaca);padding:5px 12px;border-radius:999px;box-shadow:var(--bayang);font-size:14px;font-weight:500;pointer-events:auto;cursor:pointer}
+
+#amati{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;
+  padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+#amati button{pointer-events:auto;font:inherit;cursor:pointer;border:0}
+.amati-atas{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#am-judul{background:var(--kaca);padding:8px 16px;border-radius:999px;box-shadow:var(--bayang);font-weight:600;font-size:17px;color:var(--hijau)}
+#am-tutup{background:var(--kaca);padding:9px 16px;border-radius:999px;box-shadow:var(--bayang);font-size:15px;color:var(--teks)}
+.amati-bawah{pointer-events:auto;background:var(--kaca);border-radius:18px;box-shadow:var(--bayang);padding:12px 14px;width:min(520px,100%);align-self:center}
+#am-fakta{margin:0 0 8px;font-size:15px;line-height:1.4;min-height:42px}
+#am-catatan{margin:0 0 8px;background:var(--hijau-muda);padding:7px 10px;border-radius:12px;font-size:13px}
+#am-tanya{text-align:center;margin-bottom:6px}
+#am-tanya .utama{margin-top:8px}
+.am-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.am-nav span{display:flex;align-items:center;gap:6px}
+.am-nav span button{width:40px;height:40px;border-radius:50%;background:#e9ece6;font-size:17px;color:var(--teks)}
+#am-makan{background:var(--aksen);color:#fff;padding:10px 16px;border-radius:999px;font-weight:500}
+#hud.amati-on>*:not(#gelembung):not(#petunjuk){display:none!important}
+#hud.amati-on #petunjuk{top:auto;bottom:210px}
