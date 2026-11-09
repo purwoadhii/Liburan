@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Admin Bioskop</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--hijau:#2f5d3a;--krem:#fffaf0;--teks:#26302a;--garis:#e2dccd;--merah:#b23b3b}
+*{box-sizing:border-box}
+body{margin:0;background:#f1ece0;font-family:Fredoka,system-ui,sans-serif;color:var(--teks)}
+main{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+h1{color:var(--hijau);margin:0 0 4px}
+.kartu{background:var(--krem);border-radius:18px;padding:18px;margin:16px 0;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+label{display:block;font-weight:500;margin:12px 0 4px}
+input,textarea{width:100%;font:inherit;padding:10px 12px;border:1.5px solid var(--garis);border-radius:12px;background:#fff}
+textarea{min-height:70px}
+small,.kecil{opacity:.7;font-size:13px}
+button{font:inherit;border:0;border-radius:999px;padding:10px 18px;cursor:pointer;background:#e6e1d4;color:var(--teks)}
+button.utama{background:var(--hijau);color:#fff}
+button.hapus{background:#f6dede;color:var(--merah)}
+button:disabled{opacity:.5}
+.baris{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.film{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--garis)}
+.film:first-child{border-top:0}
+.film img,.film .kosong{width:60px;height:86px;object-fit:cover;border-radius:8px;background:#2f3a33;color:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 60px}
+.film .isi{flex:1;min-width:0}
+.film .isi b{display:block}
+.film .isi span{font-size:13px;opacity:.75;word-break:break-all}
+#status{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#26302a;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;display:none;max-width:90vw;text-align:center}
+.pilihan{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.pilihan label{display:flex;gap:6px;align-items:center;margin:0;font-weight:400;background:#fff;border:1.5px solid var(--garis);padding:8px 12px;border-radius:999px}
+.pilihan input{width:auto}
+.sembunyi{display:none!important}
+progress{width:100%;height:10px}
+</style>
+</head>
+<body>
+<main>
+  <h1>🎬 Admin Bioskop</h1>
+  <p class="kecil">Film yang ditambahkan di sini muncul di bioskop game. Perubahan disimpan langsung ke repo <b>purwoadhii/Liburan</b> dan tampil di game sekitar 1–2 menit kemudian.</p>
+
+  <div class="kartu" id="k-masuk">
+    <label for="token">Token GitHub</label>
+    <input id="token" type="password" autocomplete="off" placeholder="github_pat_...">
+    <small>Buat token <i>fine-grained</i> di GitHub → Settings → Developer settings → Personal access tokens, khusus repo Liburan, izin <b>Contents: Read and write</b>. Token hanya disimpan di browser ini.</small>
+    <div class="baris"><button class="utama" id="masuk">Masuk</button><button id="keluar" class="sembunyi">Keluar</button></div>
+  </div>
+
+  <div id="isi" class="sembunyi">
+    <div class="kartu">
+      <h2 style="margin:0">Daftar film</h2>
+      <div id="daftar"></div>
+      <label for="penonton">Jumlah penonton lain di bioskop</label>
+      <input id="penonton" type="number" min="0" max="60" value="22">
+      <div class="baris"><button class="utama" id="simpan-pengaturan">Simpan</button></div>
+    </div>
+
+    <div class="kartu">
+      <h2 style="margin:0" id="judul-form">Tambah film</h2>
+      <label for="f-judul">Judul</label>
+      <input id="f-judul" maxlength="80">
+      <label for="f-sinopsis">Sinopsis singkat</label>
+      <textarea id="f-sinopsis" maxlength="300"></textarea>
+      <label>Poster (opsional)</label>
+      <input id="f-poster" type="file" accept="image/*">
+      <label>Sumber film</label>
+      <div class="pilihan">
+        <label><input type="radio" name="sumber" value="file" checked> Upload video</label>
+        <label><input type="radio" name="sumber" value="link"> Link video .mp4</label>
+        <label><input type="radio" name="sumber" value="youtube"> Link YouTube</label>
+      </div>
+      <div id="s-file"><input id="f-video" type="file" accept="video/mp4,video/webm" style="margin-top:8px"><small>Format MP4 (H.264) paling aman untuk HP. Maksimal sekitar 90 MB; video lebih besar sebaiknya dikompres dulu atau pakai link YouTube.</small></div>
+      <div id="s-link" class="sembunyi"><input id="f-link" placeholder="https://.../film.mp4" style="margin-top:8px"><small>Link harus langsung ke file video dan servernya mengizinkan diputar dari situs lain.</small></div>
+      <div id="s-youtube" class="sembunyi"><input id="f-youtube" placeholder="https://youtu.be/..." style="margin-top:8px"><small>Film YouTube diputar di layar penuh di atas bioskop, bukan di layar 3D.</small></div>
+      <progress id="progres" class="sembunyi" max="100" value="0"></progress>
+      <div class="baris"><button class="utama" id="tambah">Simpan film</button><button id="batal" class="sembunyi">Batal edit</button></div>
+    </div>
+  </div>
+</main>
+<div id="status"></div>
+
+<script>
+const REPO = 'purwoadhii/Liburan', CABANG = 'main', API = 'https://api.github.com/repos/' + REPO + '/contents/';
+const $ = id => document.getElementById(id);
+let token = localStorage.getItem('liburan_token') || '';
+let data = { penonton: 22, daftar: [] }, shaFilm = null, editIdx = -1;
+
+function status(t, ms = 3000) { const s = $('status'); s.textContent = t; s.style.display = 'block'; clearTimeout(status.t); if (ms) status.t = setTimeout(() => s.style.display = 'none', ms); }
+async function gh(path, opt = {}) {
+  const r = await fetch(API + path + (opt.method ? '' : '?ref=' + CABANG + '&t=' + Date.now()), { ...opt, headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', ...(opt.headers || {}) } });
+  if (r.status === 404 && !opt.method) return null;
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.message || ('HTTP ' + r.status)); }
+  return r.status === 204 ? null : r.json();
+}
+const b64utf8 = s => btoa(unescape(encodeURIComponent(s)));
+const utf8b64 = s => decodeURIComponent(escape(atob(s.replace(/\n/g, ''))));
+async function tulis(path, base64, pesan) {
+  const ada = await gh(path).catch(() => null);
+  return gh(path, { method: 'PUT', body: JSON.stringify({ message: pesan, content: base64, branch: CABANG, ...(ada && ada.sha ? { sha: ada.sha } : {}) }) });
+}
+async function hapusFile(path) {
+  const ada = await gh(path).catch(() => null);
+  if (ada && ada.sha) await gh(path, { method: 'DELETE', body: JSON.stringify({ message: 'Hapus ' + path, sha: ada.sha, branch: CABANG }) });
+}
+function fileB64(file) { return new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result.split(',')[1]); r.onerror = no; r.readAsDataURL(file); }); }
+function posterB64(file) {
+  return new Promise((ok, no) => {
+    const img = new Image(); img.onload = () => {
+      const w = Math.min(600, img.width), h = Math.round(img.height * w / img.width);
+      const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+      ok(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+    }; img.onerror = no; img.src = URL.createObjectURL(file);
+  });
+}
+const slug = s => (s || 'film').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'film';
+const esc = s => String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function muat() {
+  const f = await gh('film.js');
+  shaFilm = f ? f.sha : null;
+  if (f) {
+    const teks = utf8b64(f.content);
+    const m = teks.match(/window\.FILM\s*=\s*([\s\S]*?);\s*$/);
+    try { data = JSON.parse(m[1]); } catch (e) { data = { penonton: 22, daftar: [] }; }
+  }
+  data.daftar = data.daftar || [];
+  $('penonton').value = data.penonton != null ? data.penonton : 22;
+  tampil();
+}
+function tampil() {
+  const d = $('daftar');
+  if (!data.daftar.length) { d.innerHTML = '<p class="kecil">Belum ada film.</p>'; return; }
+  d.innerHTML = data.daftar.map((f, i) => `<div class="film">${f.poster ? `<img src="../${esc(f.poster)}" alt="">` : '<div class="kosong">🎬</div>'}
+    <div class="isi"><b>${esc(f.judul)}</b><span>${esc(f.sinopsis)}</span><br><span>${f.youtube ? 'YouTube: ' + esc(f.youtube) : esc(f.video)}</span>
+    <div class="baris"><button data-edit="${i}">Edit</button><button data-naik="${i}" ${i ? '' : 'disabled'}>↑</button><button class="hapus" data-hapus="${i}">Hapus</button></div></div></div>`).join('');
+}
+async function simpanData(pesan) {
+  const teks = '// Daftar film bioskop. Diisi lewat halaman admin (/admin/).\nwindow.FILM = ' + JSON.stringify(data, null, 2) + ';\n';
+  await tulis('film.js', b64utf8(teks), pesan);
+}
+
+$('daftar').onclick = async (e) => {
+  const t = e.target;
+  if (t.dataset.edit != null) {
+    editIdx = +t.dataset.edit; const f = data.daftar[editIdx];
+    $('judul-form').textContent = 'Edit film'; $('batal').classList.remove('sembunyi');
+    $('f-judul').value = f.judul; $('f-sinopsis').value = f.sinopsis || '';
+    const s = f.youtube ? 'youtube' : (f.video && !f.video.startsWith('film/') ? 'link' : 'file');
+    document.querySelector(`input[name=sumber][value=${s}]`).checked = true; gantiSumber();
+    $('f-link').value = s === 'link' ? f.video : ''; $('f-youtube').value = f.youtube || '';
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+  if (t.dataset.naik != null) { const i = +t.dataset.naik; [data.daftar[i - 1], data.daftar[i]] = [data.daftar[i], data.daftar[i - 1]]; tampil(); try { await simpanData('Ubah urutan film'); status('Urutan disimpan.'); } catch (er) { status('Gagal: ' + er.message, 6000); } }
+  if (t.dataset.hapus != null) {
+    const i = +t.dataset.hapus, f = data.daftar[i];
+    if (!confirm('Hapus film "' + f.judul + '"?')) return;
+    t.disabled = true; status('Menghapus…', 0);
+    try {
+      data.daftar.splice(i, 1); await simpanData('Hapus film ' + f.judul);
+      for (const p of [f.video, f.poster]) if (p && p.startsWith('film/')) await hapusFile(p).catch(() => {});
+      tampil(); status('Film dihapus.');
+    } catch (er) { status('Gagal: ' + er.message, 6000); }
+  }
+};
+function gantiSumber() {
+  const v = document.querySelector('input[name=sumber]:checked').value;
+  for (const k of ['file', 'link', 'youtube']) $('s-' + k).classList.toggle('sembunyi', k !== v);
+}
+document.querySelectorAll('input[name=sumber]').forEach(r => r.onchange = gantiSumber);
+function resetForm() { editIdx = -1; $('judul-form').textContent = 'Tambah film'; $('batal').classList.add('sembunyi'); for (const id of ['f-judul', 'f-sinopsis', 'f-link', 'f-youtube', 'f-poster', 'f-video']) $(id).value = ''; }
+$('batal').onclick = resetForm;
+
+$('tambah').onclick = async () => {
+  const judul = $('f-judul').value.trim();
+  if (!judul) { status('Judul belum diisi.'); return; }
+  const lama = editIdx >= 0 ? data.daftar[editIdx] : {};
+  const f = { judul, sinopsis: $('f-sinopsis').value.trim(), poster: lama.poster || '', video: '', youtube: '' };
+  const sumber = document.querySelector('input[name=sumber]:checked').value;
+  const id = slug(judul) + '-' + Date.now().toString(36);
+  const btn = $('tambah'); btn.disabled = true;
+  try {
+    if (sumber === 'youtube') {
+      f.youtube = $('f-youtube').value.trim();
+      if (!/(youtu\.be\/|v=|embed\/|shorts\/)[\w-]{11}/.test(f.youtube)) throw new Error('Link YouTube tidak dikenali.');
+    } else if (sumber === 'link') {
+      f.video = $('f-link').value.trim();
+      if (!/^https?:\/\//.test(f.video)) throw new Error('Link video belum benar.');
+    } else {
+      const file = $('f-video').files[0];
+      if (file) {
+        if (file.size > 90 * 1024 * 1024) throw new Error('Video lebih dari 90 MB. Kompres dulu atau pakai link YouTube.');
+        status('Mengunggah video… jangan tutup halaman ini.', 0);
+        $('progres').classList.remove('sembunyi'); $('progres').removeAttribute('value');
+        const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
+        f.video = 'film/' + id + '.' + ext;
+        await tulis(f.video, await fileB64(file), 'Upload film ' + judul);
+        if (lama.video && lama.video.startsWith('film/') && lama.video !== f.video) await hapusFile(lama.video).catch(() => {});
+      } else if (lama.video && !lama.youtube) f.video = lama.video;
+      else throw new Error('Pilih file video dulu.');
+    }
+    const pf = $('f-poster').files[0];
+    if (pf) {
+      status('Mengunggah poster…', 0);
+      f.poster = 'film/' + id + '-poster.jpg';
+      await tulis(f.poster, await posterB64(pf), 'Poster ' + judul);
+      if (lama.poster && lama.poster !== f.poster) await hapusFile(lama.poster).catch(() => {});
+    }
+    if (editIdx >= 0) data.daftar[editIdx] = f; else data.daftar.push(f);
+    status('Menyimpan daftar film…', 0);
+    await simpanData((editIdx >= 0 ? 'Ubah film ' : 'Tambah film ') + judul);
+    resetForm(); tampil();
+    status('Tersimpan! Film muncul di game dalam 1–2 menit.', 4000);
+  } catch (er) { status('Gagal: ' + er.message, 7000); }
+  $('progres').classList.add('sembunyi'); btn.disabled = false;
+};
+$('simpan-pengaturan').onclick = async () => {
+  data.penonton = Math.max(0, Math.min(60, +$('penonton').value || 0));
+  try { await simpanData('Ubah jumlah penonton'); status('Tersimpan.'); } catch (er) { status('Gagal: ' + er.message, 6000); }
+};
+
+async function masuk() {
+  token = $('token').value.trim() || token;
+  if (!token) { status('Isi token dulu.'); return; }
+  status('Memeriksa…', 0);
+  try {
+    await muat();
+    localStorage.setItem('liburan_token', token);
+    $('isi').classList.remove('sembunyi'); $('keluar').classList.remove('sembunyi'); $('masuk').textContent = 'Muat ulang';
+    status('Berhasil masuk.');
+  } catch (er) { status('Gagal masuk: ' + er.message, 6000); }
+}
+$('masuk').onclick = masuk;
+$('keluar').onclick = () => { localStorage.removeItem('liburan_token'); token = ''; $('token').value = ''; $('isi').classList.add('sembunyi'); $('keluar').classList.add('sembunyi'); $('masuk').textContent = 'Masuk'; };
+if (token) { $('token').value = token; masuk(); }
+</script>
+</body>
+</html>

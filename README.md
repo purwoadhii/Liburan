@@ -6,6 +6,8 @@ Game 3D jalan-jalan di taman safari, untuk browser HP dan laptop. Kamu (cewek) b
 - **Kontrol HP**: geser lingkaran kiri bawah untuk jalan, geser layar untuk melihat sekeliling, ketuk hewan atau papan untuk info.
 - **Kontrol laptop**: WASD / panah untuk jalan, Shift untuk lari, seret mouse untuk melihat, E untuk melihat info, M untuk peta.
 - **Area**: parkir dan gerbang, jalur safari (flamingo, gajah, singa, unta, bison, jerapah, zebra), kebun binatang mini, area rekreasi (bianglala, komidi putar, jajanan), harimau, beruang madu, bumi perkemahan, rumah panda, dan air terjun di ujung utara.
+- **Food court** dengan 12 kios (pilih menu, pesan, lalu duduk makan berdua) dan **bioskop** di sebelahnya: pilih film di loket, kalian duduk bergandengan, penonton lain ikut masuk, lampu meredup, film diputar di layar.
+- **Admin film**: buka `/admin/`, masuk dengan token GitHub, lalu tambah film (upload video, link .mp4, atau link YouTube) beserta poster. Data tersimpan di `film.js` dan folder `film/`.
 - Hewan pemakan tumbuhan bisa diberi wortel. Tombol 📷 untuk mengambil foto.
 
 Teks, nama gerbang, warna baju, dan kalimat pasangan bisa diubah di `data.js`.

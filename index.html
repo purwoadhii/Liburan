@@ -24,6 +24,8 @@
   </div>
   <div id="joy"><div id="joy-dasar"></div><div id="joy-tuas"></div></div>
   <div id="kanan-bawah">
+    <button id="btn-putar" class="tbl sembunyi">⏸</button>
+    <button id="btn-berdiri" class="sembunyi">Berdiri</button>
     <button id="btn-aksi" class="sembunyi">Lihat</button>
     <button id="btn-pasangan" title="Ngobrol dengan pasangan">💬</button>
   </div>
@@ -81,9 +83,15 @@
   </div>
 </div>
 
+<div id="yt" class="layar-penuh sembunyi">
+  <div class="yt-bingkai"><iframe id="yt-frame" title="Film" allow="autoplay; encrypted-media; fullscreen"></iframe>
+  <button id="yt-tutup">Keluar dari bioskop</button></div>
+</div>
+
 <div id="galat" class="layar-penuh sembunyi"><div class="kartu-info"><h2>Maaf</h2><p>Perangkat ini belum bisa menampilkan 3D (WebGL). Coba buka di Chrome atau Safari terbaru.</p></div></div>
 
 <script src="data.js"></script>
+<script src="film.js"></script>
 <script type="module" src="js/game.js"></script>
 </body>
 </html>

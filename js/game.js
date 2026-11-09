@@ -28,7 +28,7 @@ scene.background = LANGIT;
 scene.fog = new THREE.Fog('#cfe6ea', 90, 420);
 const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 900);
 
-scene.add(new THREE.HemisphereLight('#e8f6ff', '#5d7a3a', 1.6));
+const hemi = new THREE.HemisphereLight('#e8f6ff', '#5d7a3a', 1.6); scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff3dc', 2.2);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
@@ -401,7 +401,7 @@ let airTerjunMesh;
 /* ------------------------------------------------------------------ trees */
 const treeData = [];
 function farFromRoad(x, z, m) { for (const p of roadPts) { if (Math.abs(p.x - x) > 12 || Math.abs(p.z - z) > 12) continue; if (Math.hypot(p.x - x, p.z - z) < p.w + m) return false; } return true; }
-const AREA_BEBAS = [[30, 116, 36], [30, 90, 12], [55, -20, 22], [-80, -135, 16], [0, -208, 15], [-28, -150, 6]];
+const AREA_BEBAS = [[50, 68, 16], [75, 68, 17], [62, 84, 12], [40, 80, 8], [30, 116, 36], [30, 90, 12], [55, -20, 22], [-80, -135, 16], [0, -208, 15], [-28, -150, 6]];
 function bebasArea(x, z) { for (const [ax, az, r] of AREA_BEBAS) if (Math.hypot(x - ax, z - az) < r) return false; return true; }
 function bolehPohon(x, z) {
   if (!farFromRoad(x, z, 3)) return false;
@@ -543,15 +543,15 @@ function makeArm(parent, x, y, len, sleeveCol, skin, r) {
   const hand = mesh(sph(r * 1.25, 7, 5), skin, 0, -len, 0, pivot);
   return { pivot, inner, hand, len };
 }
-function makePerson(cewek) {
+function makePerson(cewek, o = {}) {
   const g = new THREE.Group();
-  const skin = cewek ? '#f1c7a5' : '#d9a57d';
-  const P = { group: g, legs: [], arms: [], headParts: [], cewek };
+  const skin = o.kulit || (cewek ? '#f1c7a5' : '#d9a57d');
+  const P = { group: g, legs: [], arms: [], headParts: [], cewek, hip: cewek ? 0.8 : 0.9 };
   if (cewek) {
-    const baju = D.bajuKamu || '#e8836f';
+    const baju = o.baju || D.bajuKamu || '#e8836f';
     for (const sx of [-0.085, 0.085]) {
       const leg = new THREE.Group(); leg.position.set(sx, 0.8, 0); g.add(leg);
-      mesh(limbDown(0.055, 0.045, 0.76), skin, 0, 0, 0, leg);
+      mesh(limbDown(0.055, 0.045, 0.76), o.celana || skin, 0, 0, 0, leg);
       mesh(box(0.11, 0.07, 0.2), '#f4f1ea', 0, -0.77, 0.03, leg);
       P.legs.push(leg);
     }
@@ -561,16 +561,18 @@ function makePerson(cewek) {
     const head = new THREE.Group(); head.position.set(0, 1.53, 0); g.add(head); P.headParts.push(head);
     mesh(sph(0.14, 12, 10), skin, 0, 0, 0, head);
     for (const sx of [-0.05, 0.05]) { mesh(sph(0.018, 6, 4), '#2a1d16', sx, 0.005, 0.128, head, false); mesh(sph(0.025, 6, 4), '#f2a7a0', sx * 1.6, -0.04, 0.11, head, false); }
-    const hair = mesh(sph(0.152, 12, 10), '#3b2417', 0, 0.025, -0.02, head); hair.scale.set(1, 0.95, 1.02);
-    const ekor = mesh(sph(1, 10, 8), '#3b2417', 0, -0.12, -0.09, head); ekor.scale.set(0.15, 0.24, 0.08);
-    mesh(cyl(0.3, 0.3, 0.02, 16), '#e9d29a', 0, 0.1, 0, head);
-    mesh(cyl(0.135, 0.15, 0.11, 12), '#e9d29a', 0, 0.16, 0, head);
-    mesh(cyl(0.152, 0.152, 0.035, 12), '#d65f5f', 0, 0.125, 0, head, false);
+    const hair = mesh(sph(0.152, 12, 10), o.rambut || '#3b2417', 0, 0.025, -0.02, head); hair.scale.set(1, 0.95, 1.02);
+    const ekor = mesh(sph(1, 10, 8), o.rambut || '#3b2417', 0, -0.12, -0.09, head); ekor.scale.set(0.15, 0.24, 0.08);
+    if (!o.npc) {
+      mesh(cyl(0.3, 0.3, 0.02, 16), '#e9d29a', 0, 0.1, 0, head);
+      mesh(cyl(0.135, 0.15, 0.11, 12), '#e9d29a', 0, 0.16, 0, head);
+      mesh(cyl(0.152, 0.152, 0.035, 12), '#d65f5f', 0, 0.125, 0, head, false);
+    }
     P.arms.push(makeArm(g, -0.19, 1.34, 0.56, baju, skin, 0.042));
     P.arms.push(makeArm(g, 0.19, 1.34, 0.56, baju, skin, 0.042));
     P.eye = 1.55;
   } else {
-    const baju = D.bajuPasangan || '#4f7d6b', celana = D.celanaPasangan || '#c9b28a';
+    const baju = o.baju || D.bajuPasangan || '#4f7d6b', celana = o.celana || D.celanaPasangan || '#c9b28a';
     for (const sx of [-0.1, 0.1]) {
       const leg = new THREE.Group(); leg.position.set(sx, 0.9, 0); g.add(leg);
       mesh(limbDown(0.075, 0.062, 0.86), celana, 0, 0, 0, leg);
@@ -579,17 +581,17 @@ function makePerson(cewek) {
     }
     mesh(cyl(0.2, 0.175, 0.6, 10), baju, 0, 1.18, 0, g);
     mesh(cyl(0.205, 0.205, 0.1, 10), celana, 0, 0.9, 0, g);
-    mesh(cyl(0.06, 0.06, 0.1, 6), '#d9a57d', 0, 1.52, 0, g);
+    mesh(cyl(0.06, 0.06, 0.1, 6), skin, 0, 1.52, 0, g);
     const head = new THREE.Group(); head.position.set(0, 1.67, 0); g.add(head); P.headParts.push(head);
     mesh(sph(0.15, 12, 10), skin, 0, 0, 0, head);
     for (const sx of [-0.055, 0.055]) mesh(sph(0.019, 6, 4), '#2a1d16', sx, 0.01, 0.138, head, false);
-    const hair = mesh(sph(0.158, 12, 10), '#221712', 0, 0.045, -0.025, head); hair.scale.set(1.02, 0.8, 1.02);
+    const hair = mesh(sph(0.158, 12, 10), o.rambut || '#221712', 0, 0.045, -0.025, head); hair.scale.set(1.02, 0.8, 1.02);
     mesh(box(0.06, 0.012, 0.012), '#5a3b2a', 0, -0.06, 0.145, head, false);
     P.arms.push(makeArm(g, -0.25, 1.44, 0.62, baju, skin, 0.05));
     P.arms.push(makeArm(g, 0.25, 1.44, 0.62, baju, skin, 0.05));
     P.eye = 1.68;
   }
-  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.traverse(m => { if (m.isMesh) m.castShadow = !o.npc; });
   scene.add(g);
   return P;
 }
@@ -802,6 +804,353 @@ const jip = (() => {
   return { group: g, u: 0.15 };
 })();
 
+/* ------------------------------------------------------------------ food court & bioskop */
+const F = window.FILM || { daftar: [] };
+const GEDUNG = [];
+let duduk = null, distCam = 5.2;
+const npcs = [];
+const atapList = [];
+const WARNA_BAJU = ['#5aa7dc', '#e8836f', '#6aa64e', '#f2d14b', '#d98ad6', '#ffffff', '#3b3b46', '#c95b5b', '#7a6ad0', '#f29b4b', '#2f7f7a'];
+const WARNA_CELANA = ['#2f3a4f', '#3b3b46', '#c9b28a', '#5a4a3a', '#7d8a99'];
+const WARNA_RAMBUT = ['#221712', '#3b2417', '#1a1a1a', '#5a3b2a'];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+function buatNpc(posisi) {
+  const cewek = Math.random() < 0.5;
+  const P = makePerson(cewek, { npc: true, baju: pick(WARNA_BAJU), celana: cewek ? (Math.random() < 0.5 ? null : pick(WARNA_CELANA)) : pick(WARNA_CELANA), rambut: pick(WARNA_RAMBUT), kulit: pick(['#f1c7a5', '#d9a57d', '#c68e64', '#e8b98f']) });
+  P.group.position.set(posisi[0], 0, posisi[1]);
+  for (const a of P.arms) swingArm(a, 0, 1);
+  const N = { P, x: posisi[0], z: posisi[1], yaw: 0, jalur: [], phase: Math.random() * 6, duduk: false, speed: rand(1.1, 1.5) };
+  npcs.push(N);
+  return N;
+}
+function npcDuduk(N, x, z, yaw) { N.duduk = true; N.x = x; N.z = z; N.yaw = yaw; }
+
+function dinding(x1, z1, x2, z2, h, warna, tebal = 0.3) {
+  const L = Math.hypot(x2 - x1, z2 - z1);
+  const w = mesh(box(L, h, tebal), warna, (x1 + x2) / 2, h / 2, (z1 + z2) / 2, scene);
+  w.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
+  addSeg(x1, z1, x2, z2);
+  return w;
+}
+function gedung(id, x1, z1, x2, z2, h, warnaLuar, pintu, lantai, judul) {
+  // pintu = [xa, xb] di dinding selatan (z2)
+  const G0 = { id, x1, z1, x2, z2, h };
+  dinding(x1, z1, x2, z1, h, warnaLuar);
+  dinding(x1, z1, x1, z2, h, warnaLuar);
+  dinding(x2, z1, x2, z2, h, warnaLuar);
+  dinding(x1, z2, pintu[0], z2, h, warnaLuar);
+  dinding(pintu[1], z2, x2, z2, h, warnaLuar);
+  mesh(box(pintu[1] - pintu[0], h - 3.2, 0.3), warnaLuar, (pintu[0] + pintu[1]) / 2, 3.2 + (h - 3.2) / 2, z2, scene);
+  const lt = new THREE.Mesh(new THREE.PlaneGeometry(x2 - x1, z2 - z1), new THREE.MeshLambertMaterial({ map: lantai, polygonOffset: true, polygonOffsetFactor: -3 }));
+  lt.rotation.x = -Math.PI / 2; lt.position.set((x1 + x2) / 2, 0.06, (z1 + z2) / 2); lt.receiveShadow = true; scene.add(lt);
+  const atap = new THREE.Group(); scene.add(atap);
+  mesh(box(x2 - x1 + 1.2, 0.5, z2 - z1 + 1.2), '#8c8378', (x1 + x2) / 2, h + 0.25, (z1 + z2) / 2, atap);
+  G0.atap = atap;
+  const papan = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(12, (x2 - x1) * 0.7), 2), new THREE.MeshLambertMaterial({ map: textTex(judul, { w: 1024, h: 180, size: 96, size2: 40, bg: '#2f3a33', border: '#f2d14b' }), emissive: '#222' }));
+  papan.position.set((x1 + x2) / 2, h - 1.3, z2 + 0.2); scene.add(papan);
+  GEDUNG.push(G0);
+  return G0;
+}
+function gedungDalam(x, z) { for (const b of GEDUNG) if (x > b.x1 && x < b.x2 && z > b.z1 && z < b.z2) return b; return null; }
+
+const tLantaiFC = tex(128, 128, (c, w, h) => { for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { c.fillStyle = (x + y) % 2 ? '#e9e2d4' : '#d8cdb8'; c.fillRect(x * 32, y * 32, 32, 32); } }, [12, 10]);
+const tKarpet = tex(128, 128, (c, w, h) => { noiseFill(c, w, h, '#5a2430', ['#4a1c26', '#6a2c38', '#7a3a2a'], 600, [1, 3]); }, [8, 8]);
+
+/* plaza & jalan menuju */
+{
+  const tP2 = tPaving.clone(); tP2.wrapS = tP2.wrapT = THREE.RepeatWrapping; tP2.repeat.set(12, 2); tP2.needsUpdate = true;
+  const pz = new THREE.Mesh(new THREE.PlaneGeometry(50, 9), new THREE.MeshLambertMaterial({ map: tP2, polygonOffset: true, polygonOffsetFactor: -2 }));
+  pz.rotation.x = -Math.PI / 2; pz.position.set(62, 0.045, 84.5); pz.receiveShadow = true; scene.add(pz);
+}
+ribbon([[30, 80], [36, 83], [40, 84]], 4.6, 0.025, mTepi);
+ribbon([[30, 80], [36, 83], [40, 84]], 3.6, 0.045, mPaving, false, '#e6d3a8');
+
+/* ---------- food court ---------- */
+const KIOS = [
+  { nama: 'Nasi Goreng', emoji: '🍳', warna: '#e8836f', menu: [['Nasi Goreng Spesial', 28], ['Nasi Goreng Seafood', 32], ['Kwetiau Goreng', 27]] },
+  { nama: 'Bakso', emoji: '🍜', warna: '#c95b5b', menu: [['Bakso Urat', 25], ['Bakso Beranak', 35], ['Mie Bakso', 27]] },
+  { nama: 'Sate', emoji: '🍢', warna: '#f29b4b', menu: [['Sate Ayam (10 tusuk)', 30], ['Sate Kambing', 40], ['Lontong', 6]] },
+  { nama: 'Mie Ayam', emoji: '🍜', warna: '#f2d14b', menu: [['Mie Ayam', 22], ['Mie Ayam Jamur', 25], ['Pangsit Goreng', 10]] },
+  { nama: 'Soto', emoji: '🥣', warna: '#e3b23c', menu: [['Soto Ayam', 24], ['Soto Betawi', 32], ['Nasi Putih', 6]] },
+  { nama: 'Ayam Geprek', emoji: '🍗', warna: '#d64545', menu: [['Ayam Geprek Sambal Bawang', 25], ['Ayam Geprek Keju', 30], ['Tahu Tempe', 8]] },
+  { nama: 'Dimsum', emoji: '🥟', warna: '#6aa64e', menu: [['Siomay Ayam', 20], ['Hakau Udang', 24], ['Bakpao Coklat', 15]] },
+  { nama: 'Pempek', emoji: '🐟', warna: '#5aa7dc', menu: [['Pempek Kapal Selam', 22], ['Pempek Lenjer', 18], ['Tekwan', 20]] },
+  { nama: 'Martabak', emoji: '🥞', warna: '#a0522d', menu: [['Martabak Manis Coklat Keju', 35], ['Martabak Telur', 32], ['Terang Bulan Mini', 15]] },
+  { nama: 'Masakan Jepang', emoji: '🍣', warna: '#d98ad6', menu: [['Ramen', 38], ['Sushi Roll', 35], ['Chicken Katsu', 33]] },
+  { nama: 'Kopi & Teh', emoji: '☕', warna: '#7a5634', menu: [['Es Kopi Susu', 20], ['Teh Tarik', 15], ['Es Teh Manis', 8]] },
+  { nama: 'Es Krim & Jus', emoji: '🍦', warna: '#2f7f7a', menu: [['Es Krim 2 Rasa', 18], ['Jus Alpukat', 20], ['Es Campur', 18]] }
+];
+const MEJA = [];
+let pesanan = [];
+{
+  const fc = gedung('foodcourt', 38, 58, 62, 78, 6, '#efe3c8', [45, 55], tLantaiFC, ['FOOD COURT', 'Banyak pilihan makanan']);
+  // kios: 6 di utara, 3 di barat, 3 di timur
+  const slot = [];
+  for (let i = 0; i < 6; i++) slot.push([40.6 + i * 3.75, 59.6, 0]);
+  for (let i = 0; i < 3; i++) slot.push([39.6, 63.5 + i * 4.2, Math.PI / 2]);
+  for (let i = 0; i < 3; i++) slot.push([60.4, 63.5 + i * 4.2, -Math.PI / 2]);
+  KIOS.forEach((k, i) => {
+    const [x, z, r] = slot[i];
+    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = r; scene.add(g);
+    mesh(box(3.4, 1.05, 0.7), '#f8f4ea', 0, 0.52, 0.9, g);
+    mesh(box(3.5, 0.08, 0.85), k.warna, 0, 1.08, 0.9, g);
+    mesh(box(3.5, 3.2, 0.2), '#d8cdb8', 0, 1.6, -0.4, g);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 0.9), new THREE.MeshLambertMaterial({ map: textTex([k.emoji + ' ' + k.nama], { w: 512, h: 140, size: 58, bg: k.warna, border: '#ffffff' }), emissive: '#333' }));
+    sign.position.set(0, 2.85, -0.28); g.add(sign);
+    for (let j = 0; j < 7; j++) { const aw = mesh(box(0.5, 0.06, 1), j % 2 ? '#ffffff' : k.warna, -1.5 + j * 0.5, 2.25, 0.2, g, false); aw.rotation.x = 0.35; }
+    for (let j = 0; j < 3; j++) mesh(cyl(0.16, 0.12, 0.12, 8), ['#ffffff', '#f2d14b', '#e8836f'][j], -0.9 + j * 0.9, 1.18, 0.9, g, false);
+    const koki = buatNpc([0, 0]); g.add(koki.P.group); koki.P.group.position.set(0, 0, 0.1); koki.diam = true; koki.local = true;
+    // tabrakan konter
+    const c = Math.cos(r), sn = Math.sin(r);
+    const wp = (lx, lz) => [x + lx * c + lz * sn, z - lx * sn + lz * c];
+    const a = wp(-1.75, 1.3), b = wp(1.75, 1.3); addSeg(a[0], a[1], b[0], b[1]);
+    const it = addInteract(g, 'kios', i, 3.6); it.label = 'Pesan di ' + k.nama; it.pusat = wp(0, 1.8);
+  });
+  // meja
+  for (const tx of [43.5, 50, 56.5]) for (const tz of [65.5, 70, 74.5]) {
+    const g = new THREE.Group(); g.position.set(tx, 0, tz); scene.add(g);
+    mesh(box(1.8, 0.08, 1.0), '#8b6440', 0, 0.76, 0, g); mesh(cyl(0.08, 0.1, 0.74, 6), '#555', 0, 0.37, 0, g, false);
+    for (const [cx, cz] of [[-0.45, 0.85], [0.45, 0.85], [-0.45, -0.85], [0.45, -0.85]]) {
+      mesh(box(0.5, 0.06, 0.5), '#c95b5b', cx, 0.46, cz, g, false); mesh(box(0.5, 0.55, 0.06), '#c95b5b', cx, 0.75, cz + Math.sign(cz) * 0.24, g, false);
+      mesh(cyl(0.04, 0.04, 0.44, 5), '#555', cx, 0.22, cz, g, false);
+    }
+    addCircle(tx - 0.5, tz, 0.55); addCircle(tx + 0.5, tz, 0.55);
+    const m = { x: tx, z: tz, g, makanan: [] };
+    MEJA.push(m);
+    const it = addInteract(g, 'meja', m, 2.4); it.label = 'Duduk di sini';
+  }
+  // pengunjung yang sedang makan
+  MEJA.forEach((m, i) => {
+    if (i === 4 || Math.random() < 0.3) return;
+    for (const sx of [-0.45, 0.45]) if (Math.random() < 0.75) { const N = buatNpc([m.x + sx, m.z - 0.85]); npcDuduk(N, m.x + sx, m.z - 0.85, Math.PI); N.makan = true; }
+    if (Math.random() < 0.5) mesh(cyl(0.16, 0.12, 0.1, 8), '#f8f4ea', m.x, 0.85, m.z - 0.2, scene, false);
+  });
+  // pengunjung yang berjalan di dalam
+  for (let i = 0; i < 4; i++) { const N = buatNpc([rand(44, 56), rand(63, 76)]); N.keliling = fc; }
+}
+
+/* ---------- bioskop ---------- */
+const BIOS = { x1: 64, z1: 56, x2: 86, z2: 80, kursi: [], film: null, video: null, status: 'kosong', penonton: [] };
+{
+  gedung('bioskop', 64, 56, 86, 80, 8, '#3a3550', [65, 69.5], tKarpet, ['BIOSKOP', 'Film pilihan hari ini']);
+  // layar
+  const bingkai = mesh(box(18.6, 8.2, 0.3), '#111', 76, 4.6, 56.4, scene, false);
+  BIOS.layarMat = new THREE.MeshBasicMaterial({ color: '#ffffff', map: textTex(['Pilih film di loket', '🎬'], { w: 1024, h: 440, size: 80, size2: 120, bg: '#1d1d26', border: '#1d1d26' }) });
+  BIOS.layar = new THREE.Mesh(new THREE.PlaneGeometry(18, 7.6), BIOS.layarMat);
+  BIOS.layar.position.set(76, 4.6, 56.6); scene.add(BIOS.layar);
+  // kursi
+  const rows = [63.5, 66, 68.5, 71, 73.5];
+  const xs = []; for (let x = 69; x <= 84.7; x += 1.3) xs.push(+x.toFixed(2));
+  const n = rows.length * xs.length;
+  const dudukan = new THREE.InstancedMesh(box(1.1, 0.45, 0.8), mat('#a3262f'), n);
+  const sandaran = new THREE.InstancedMesh(box(1.1, 0.6, 0.16), mat('#a3262f'), n);
+  const m4 = new THREE.Matrix4(); let i = 0;
+  rows.forEach((z, r) => {
+    const h = r * 0.32;
+    if (h > 0) mesh(box(17.4, h, 2.5), '#4a1c26', 77, h / 2, z + 0.2, scene, false);
+    for (const x of xs) {
+      m4.makeTranslation(x, 0.23 + h, z); dudukan.setMatrixAt(i, m4);
+      m4.makeTranslation(x, 0.62 + h, z + 0.38); sandaran.setMatrixAt(i, m4); i++;
+      BIOS.kursi.push({ x, z, h, terisi: false });
+    }
+  });
+  scene.add(dudukan, sandaran);
+  for (const z of rows) addSeg(68.4, z + 0.5, 85.6, z + 0.5);
+  BIOS.rows = rows; BIOS.xs = xs;
+  // loket di depan
+  const lk = new THREE.Group(); lk.position.set(72.5, 0, 83); scene.add(lk);
+  mesh(box(3, 1.2, 1), '#3a3550', 0, 0.6, 0, lk);
+  const poster = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6), new THREE.MeshLambertMaterial({ map: textTex(['🎟️ Loket Film', 'Ketuk untuk pilih'], { w: 512, h: 340, size: 62, size2: 40, bg: '#a3262f', border: '#f2d14b' }), emissive: '#333' }));
+  poster.position.set(0, 2.2, 0.06); lk.add(poster); mesh(box(2.6, 1.8, 0.1), '#222', 0, 2.2, 0, lk, false);
+  addCircle(72.5, 83, 1.5);
+  const it = addInteract(lk, 'bioskop', null, 4); it.label = '🎟️ Pilih film';
+  const it2 = addInteract(BIOS.layar, 'bioskop', null, 0); it2.label = '🎬 Pilih film';
+}
+
+/* ---------- kartu bantu ---------- */
+function kartu(emoji, judul, html, aksiLabel, aksiFn) {
+  paused = true;
+  $('k-emoji').textContent = emoji; $('k-judul').textContent = judul; $('k-isi').innerHTML = html;
+  const b = $('k-aksi');
+  if (aksiLabel) { b.textContent = aksiLabel; b.classList.remove('sembunyi'); kartuAksi = aksiFn; } else { b.classList.add('sembunyi'); kartuAksi = null; }
+  $('kartu').classList.remove('sembunyi');
+}
+const rupiah = (k) => 'Rp' + k + '.000';
+function bukaKios(i) {
+  const k = KIOS[i];
+  const html = '<div class="menu">' + k.menu.map((m, j) => `<label class="menu-item"><input type="checkbox" value="${j}"><span>${m[0]}</span><b>${rupiah(m[1])}</b></label>`).join('') + '</div>' +
+    (pesanan.length ? `<div class="catatan">Pesanan kalian: ${pesanan.map(p => p.emoji + ' ' + p.nama).join(', ')}</div>` : '<div class="catatan">Pilih menu, lalu duduk di meja mana saja. Makanan diantar ke meja kalian.</div>');
+  kartu(k.emoji, k.nama, html, 'Pesan', () => {
+    const dipilih = [...document.querySelectorAll('#k-isi input:checked')].map(x => k.menu[+x.value]);
+    if (!dipilih.length) { hint('Belum ada menu yang dipilih.'); return; }
+    for (const m of dipilih) pesanan.push({ nama: m[0], emoji: k.emoji, warna: k.warna });
+    pesanan = pesanan.slice(-6);
+    hint(`Pesanan dicatat: ${dipilih.map(m => m[0]).join(', ')}. Yuk cari meja!`, 3500);
+    if (duduk && duduk.meja) taruhMakanan(duduk.meja);
+    else bicara(pick(['Wah, kelihatannya enak!', 'Aku juga lapar nih.', 'Pilihan bagus, sayang.']));
+  });
+  $('k-aksi').textContent = 'Pesan';
+}
+function taruhMakanan(m) {
+  for (const o of m.makanan) scene.remove(o);
+  m.makanan = [];
+  pesanan.forEach((p, i) => {
+    const g = new THREE.Group(); g.position.set(m.x - 0.6 + (i % 3) * 0.6, 0.8, m.z + 0.25 - Math.floor(i / 3) * 0.4); scene.add(g);
+    mesh(cyl(0.17, 0.12, 0.1, 10), '#f8f4ea', 0, 0.05, 0, g, false);
+    mesh(cyl(0.14, 0.14, 0.03, 10), p.warna, 0, 0.1, 0, g, false);
+    m.makanan.push(g);
+  });
+}
+function dudukMeja(m) {
+  duduk = { meja: m, a: [m.x - 0.45, m.z + 0.85], b: [m.x + 0.45, m.z + 0.85], yaw: 0, sejak: 0 };
+  if (pesanan.length) { taruhMakanan(m); hint('Selamat makan! 🍽️', 2500); setTimeout(() => bicara(pick(['Enak banget! Mau coba punyaku?', 'Makan bareng kamu rasanya lebih enak.', 'Habis ini kita jalan lagi ya.'])), 1500); }
+  else hint('Belum pesan makanan. Pilih kios dulu, nanti makanannya diantar ke sini.', 3500);
+  tampilBerdiri(true);
+}
+function tampilBerdiri(on) { $('btn-berdiri').classList.toggle('sembunyi', !on); }
+function berdiri() {
+  if (!duduk) return;
+  if (duduk.meja) { if (duduk.sejak > 6 && pesanan.length) { for (const o of duduk.meja.makanan) scene.remove(o); duduk.meja.makanan = []; pesanan = []; } player.x = duduk.meja.x; player.z = duduk.meja.z + 1.9; }
+  if (duduk.bioskop) { selesaiFilm(); player.x = 66.6; player.z = duduk.a[1]; }
+  partner.x = player.x + 0.7; partner.z = player.z;
+  duduk = null; tampilBerdiri(false);
+  kamu.group.position.y = 0; dia.group.position.y = 0;
+}
+function posisiDuduk() {
+  duduk.sejak += 1 / 60;
+  player.x = duduk.a[0]; player.z = duduk.a[1]; partner.x = duduk.b[0]; partner.z = duduk.b[1];
+  player.yaw = duduk.yaw; player.speed = 0; partner.speed = 0;
+  const hh = duduk.h || 0;
+  kamu.group.position.set(player.x, 0.52 - kamu.hip + hh, player.z); dia.group.position.set(partner.x, 0.52 - dia.hip + hh, partner.z);
+  kamu.group.rotation.y = dia.group.rotation.y = duduk.yaw + Math.PI;
+  for (const P of [kamu, dia]) for (const l of P.legs) l.rotation.x = -1.45;
+  if (duduk.meja && duduk.meja.makanan.length && Math.random() < 0.01) { tmpB.set(player.x, 1.4, player.z); hearts(tmpB, 1, pick(['😋', '💛'])); }
+}
+
+/* ---------- film ---------- */
+function ytId(u) { const m = String(u || '').match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : null; }
+function bukaFilm() {
+  const daftar = (F.daftar || []).filter(f => f.judul);
+  if (!daftar.length) { kartu('🎬', 'Bioskop', '<p>Belum ada film yang diputar. Film bisa ditambahkan lewat halaman admin.</p>'); return; }
+  const html = '<div class="menu">' + daftar.map((f, i) => `<label class="menu-item film"><input type="radio" name="film" value="${i}" ${i === 0 ? 'checked' : ''}>${f.poster ? `<img src="${f.poster}" alt="">` : '<span class="poster-kosong">🎬</span>'}<span><b>${f.judul}</b><small>${f.sinopsis || ''}</small></span></label>`).join('') + '</div>';
+  kartu('🎬', 'Pilih Film', html, 'Tonton berdua 🍿', () => {
+    const x = document.querySelector('#k-isi input[name=film]:checked');
+    mulaiFilm(daftar[x ? +x.value : 0]);
+  });
+}
+function siapkanVideo(src) {
+  const v = document.createElement('video');
+  v.src = src; v.crossOrigin = 'anonymous'; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto';
+  return v;
+}
+function mulaiFilm(f) {
+  if (BIOS.video) selesaiFilm(true);
+  const yt = ytId(f.youtube || f.video);
+  BIOS.film = f; BIOS.status = 'masuk'; BIOS.timer = 18;
+  if (!yt && f.video) {
+    const v = siapkanVideo(f.video); BIOS.video = v;
+    v.play().then(() => v.pause()).catch(() => {});
+    const vt = new THREE.VideoTexture(v); vt.colorSpace = THREE.SRGBColorSpace;
+    BIOS.vt = vt;
+    v.onended = () => { hint('Filmnya selesai. Terima kasih sudah menonton! 🎬', 3500); setTimeout(() => { if (duduk && duduk.bioskop) berdiri(); }, 2500); };
+  } else BIOS.yt = yt;
+  BIOS.layarMat.map = textTex([f.judul, 'Segera dimulai…'], { w: 1024, h: 440, size: 72, size2: 48, bg: '#1d1d26', border: '#1d1d26' }); BIOS.layarMat.needsUpdate = true;
+  // kursi pasangan di tengah baris ke-3
+  const z = BIOS.rows[2], xi = Math.floor(BIOS.xs.length / 2) - 1;
+  const ka = BIOS.kursi.find(k => k.z === z && k.x === BIOS.xs[xi]), kb = BIOS.kursi.find(k => k.z === z && k.x === BIOS.xs[xi + 1]);
+  BIOS.kursi.forEach(k => k.terisi = false); ka.terisi = kb.terisi = true;
+  duduk = { bioskop: true, a: [ka.x, ka.z], b: [kb.x, kb.z], h: ka.h, yaw: 0, sejak: 0 };
+  camYaw = 0; camPitch = mode === 'tpp' ? 0.12 : -0.12;
+  tampilBerdiri(true);
+  hint('Penonton lain mulai masuk… film dimulai sebentar lagi 🍿', 4000);
+  setTimeout(() => bicara('Aku pegang tanganmu terus ya selama filmnya.'), 1500);
+  // penonton lain
+  const kosong = BIOS.kursi.filter(k => !k.terisi).sort(() => Math.random() - 0.5);
+  const jumlah = Math.min(kosong.length, F.penonton || 22);
+  for (let i = 0; i < jumlah; i++) {
+    const k = kosong[i]; k.terisi = true;
+    const N = buatNpc([rand(62, 74), rand(84, 88.5)]); N.speed = rand(1.6, 2);
+    N.jalur = [[67.3, 81.5], [67.3, 78], [66.6, k.z + 1.1], [k.x, k.z + 1.1], [k.x, k.z]];
+    N.tunda = i * 0.35; N.kursi = k; N.bioskop = true;
+    BIOS.penonton.push(N);
+  }
+}
+function putarFilm() {
+  const f = BIOS.film; if (!f) return;
+  BIOS.status = 'putar';
+  if (BIOS.video) {
+    BIOS.layarMat.map = BIOS.vt; BIOS.layarMat.needsUpdate = true;
+    BIOS.video.currentTime = 0; BIOS.video.play().catch(() => { hint('Ketuk ▶ untuk memutar film.', 3000); });
+    $('btn-putar').classList.remove('sembunyi'); $('btn-putar').textContent = '⏸';
+  } else if (BIOS.yt) {
+    $('yt-frame').src = `https://www.youtube.com/embed/${BIOS.yt}?autoplay=1&playsinline=1&rel=0`;
+    $('yt').classList.remove('sembunyi');
+  }
+}
+function selesaiFilm(diam) {
+  if (BIOS.video) { BIOS.video.pause(); BIOS.video.removeAttribute('src'); BIOS.video.load(); BIOS.video = null; }
+  if (BIOS.vt) { BIOS.vt.dispose(); BIOS.vt = null; }
+  BIOS.yt = null; $('yt-frame').src = 'about:blank'; $('yt').classList.add('sembunyi');
+  $('btn-putar').classList.add('sembunyi');
+  BIOS.status = 'kosong'; BIOS.film = null;
+  BIOS.layarMat.map = textTex(['Pilih film di loket', '🎬'], { w: 1024, h: 440, size: 80, size2: 120, bg: '#1d1d26', border: '#1d1d26' }); BIOS.layarMat.needsUpdate = true;
+  for (const N of BIOS.penonton) { N.duduk = false; N.jalur = [[N.kursi.x, N.kursi.z + 1.1], [66.6, N.kursi.z + 1.1], [67.3, 78], [67.3, 84], [rand(50, 75), 88]]; N.pergi = true; N.tunda = rand(0, 3); }
+  BIOS.penonton = [];
+  BIOS.kursi.forEach(k => k.terisi = false);
+}
+
+/* ---------- update ---------- */
+let cullT = 0;
+function updateGedung(dt, t, dalam) {
+  // redupkan lampu saat film diputar
+  const gelap = dalam && dalam.id === 'bioskop' && BIOS.status === 'putar' ? 1 : (dalam && dalam.id === 'bioskop' ? 0.35 : 0);
+  hemi.intensity = lerp(hemi.intensity, 1.6 - gelap * 1.35, Math.min(1, dt * 2));
+  sun.intensity = lerp(sun.intensity, 2.2 - gelap * 2.0, Math.min(1, dt * 2));
+  if (BIOS.status === 'masuk') { BIOS.timer -= dt; if (BIOS.timer <= 0 || (BIOS.timer < 14 && BIOS.penonton.every(n => n.duduk))) putarFilm(); }
+  // penonton & pengunjung
+  for (let i = npcs.length - 1; i >= 0; i--) {
+    const N = npcs[i]; if (N.local) { continue; }
+    if (N.tunda > 0) { N.tunda -= dt; N.P.group.visible = false; continue; }
+    N.P.group.visible = N.vis !== false;
+    let moving = false;
+    if (N.duduk) {
+      N.P.group.position.set(N.x, 0.52 - N.P.hip + (N.kursi && !N.pergi ? N.kursi.h : 0), N.z);
+      for (const l of N.P.legs) l.rotation.x = -1.45;
+      if (N.makan) N.P.headParts[0].rotation.x = 0.25 + Math.sin(t * 3 + i) * 0.12;
+    } else {
+      if (!N.jalur.length && N.keliling) { const b = N.keliling; N.jalur = [[rand(b.x1 + 4, b.x2 - 4), rand(b.z1 + 4, b.z2 - 3)]]; N.diamT = rand(1, 4); }
+      if (N.diamT > 0) N.diamT -= dt;
+      else if (N.jalur.length) {
+        const [tx, tz] = N.jalur[0], dx = tx - N.x, dz = tz - N.z, d = Math.hypot(dx, dz);
+        if (d < 0.15) {
+          N.jalur.shift();
+          if (!N.jalur.length) {
+            if (N.pergi) { scene.remove(N.P.group); npcs.splice(i, 1); continue; }
+            if (N.bioskop) { N.duduk = true; N.yaw = 0; }
+          }
+        } else {
+          N.yaw += angDiff(N.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
+          const st = Math.min(d, N.speed * dt); N.x += dx / d * st; N.z += dz / d * st; moving = true;
+        }
+      }
+      N.phase += moving ? dt * N.speed * 2.6 : 0;
+      N.P.group.position.set(N.x, N.kursi && N.jalur.length <= 2 && !N.pergi ? N.kursi.h : (N.pergi && N.jalur.length >= 4 ? N.kursi.h : 0), N.z);
+      animPerson(N.P, N.phase, moving ? 0.8 : 0);
+      swingArm(N.P.arms[0], -Math.sin(N.phase) * 0.4 * (moving ? 1 : 0), 1); swingArm(N.P.arms[1], Math.sin(N.phase) * 0.4 * (moving ? 1 : 0), -1);
+    }
+    N.P.group.rotation.y = N.yaw + Math.PI;
+  }
+  // sembunyikan yang jauh supaya ringan di HP
+  cullT -= dt;
+  if (cullT <= 0) {
+    cullT = 0.4;
+    for (const A of animals) A.group.visible = Math.hypot(A.group.position.x - player.x, A.group.position.z - player.z) < 120;
+    for (const N of npcs) if (!N.local) N.vis = Math.hypot(N.x - player.x, N.z - player.z) < 70;
+  }
+}
+$('btn-berdiri').onclick = berdiri;
+$('btn-putar').onclick = () => { const v = BIOS.video; if (!v) return; if (v.paused) { v.play(); $('btn-putar').textContent = '⏸'; } else { v.pause(); $('btn-putar').textContent = '▶'; } };
+$('yt-tutup').onclick = () => berdiri();
 /* papan nama setiap area */
 const ZONES = [
   { id: 'parkir', nama: 'Parkir & Pintu Masuk', x: 30, z: 112, r: 30 },
@@ -820,6 +1169,8 @@ const ZONES = [
   { id: 'kemah', nama: 'Bumi Perkemahan', x: -80, z: -135, r: 18 },
   { id: 'panda', nama: 'Rumah Panda', x: -55, z: -186, r: 20, sign: [-52, -172, 0.2] },
   { id: 'airterjun', nama: 'Air Terjun', x: 0, z: -206, r: 24 },
+  { id: 'foodcourt', nama: 'Food Court', x: 50, z: 70, r: 14 },
+  { id: 'bioskop', nama: 'Bioskop', x: 75, z: 70, r: 14 },
   { id: 'safari', nama: 'Jalur Safari', x: -55, z: 5, r: 60 },
   { id: 'jalan', nama: 'Jalan Utama', x: 14, z: -40, r: 400 }
 ];
@@ -922,6 +1273,9 @@ function openInter(it) {
   let info, key;
   if (it.kind === 'hewan') { key = it.data; info = INFO[key]; }
   else if (it.kind === 'papan') { key = SPES_ZONA[it.data]; info = INFO[key]; if (!info) return; if (it.data === 'babyzoo') info = { nama: 'Kebun Binatang Mini', emoji: '🐰🐐', fakta: [...INFO.kelinci.fakta, ...INFO.kambing.fakta], makan: true }; }
+  else if (it.kind === 'kios') { bukaKios(it.data); return; }
+  else if (it.kind === 'meja') { dudukMeja(it.data); return; }
+  else if (it.kind === 'bioskop') { bukaFilm(); return; }
   else { info = LANDMARK[it.data]; }
   if (!info) return;
   paused = true;
@@ -974,6 +1328,7 @@ function gambarPeta() {
   c.fillStyle = '#5fb3c9'; c.beginPath(); c.ellipse(wx(0), wz(-208), 11 * PX, 9 * PX, 0, 0, 7); c.fill();
   c.fillRect(wx(-4.5), wz(-224), 9 * PX, 14 * PX);
   c.fillStyle = '#6f7276'; c.fillRect(wx(-2), wz(101), 64 * PX, 30 * PX);
+  c.fillStyle = '#e9dcc0'; c.strokeStyle = '#8b6440'; c.lineWidth = 2; for (const b of GEDUNG) { c.fillRect(wx(b.x1), wz(b.z1), (b.x2 - b.x1) * PX, (b.z2 - b.z1) * PX); c.strokeRect(wx(b.x1), wz(b.z1), (b.x2 - b.x1) * PX, (b.z2 - b.z1) * PX); }
   c.lineCap = 'round'; c.lineJoin = 'round';
   for (const r of mapRoads) { c.strokeStyle = r.color; c.lineWidth = r.w * PX; c.beginPath(); r.pts.forEach((p, i) => i ? c.lineTo(wx(p[0]), wz(p[1])) : c.moveTo(wx(p[0]), wz(p[1]))); c.stroke(); }
   for (const a of mapAreas) {
@@ -984,7 +1339,7 @@ function gambarPeta() {
   c.fillStyle = '#5fb3c9'; c.beginPath(); c.ellipse(wx(-28), wz(87), 6.5 * PX, 5 * PX, 0, 0, 7); c.fill();
   c.strokeStyle = '#555'; c.lineWidth = 3; c.beginPath(); c.moveTo(wx(-148), wz(90)); c.lineTo(wx(21), wz(90)); c.moveTo(wx(39), wz(90)); c.lineTo(wx(88), wz(90)); c.stroke();
   c.textAlign = 'center'; c.textBaseline = 'middle';
-  const lab = [['🦩', -28, 87], ['🐘', -75, 83], ['🦁', -50, 28], ['🐫', -125, 15], ['🦬', -125, -28], ['🦒', -62, -20], ['🦓', -80, -80], ['🐰', 58, 35], ['🎡', 60, -22], ['🐅', 48, -72], ['🐻', -30, -98], ['⛺', -80, -135], ['🐼', -55, -186], ['💦', 0, -214], ['🅿️', 30, 116], ['🎟️', 30, 90], ['🚙', -100, 40]];
+  const lab = [['🦩', -28, 87], ['🐘', -75, 83], ['🦁', -50, 28], ['🐫', -125, 15], ['🦬', -125, -28], ['🦒', -62, -20], ['🦓', -80, -80], ['🐰', 58, 35], ['🎡', 60, -22], ['🐅', 48, -72], ['🐻', -30, -98], ['⛺', -80, -135], ['🐼', -55, -186], ['💦', 0, -214], ['🅿️', 30, 116], ['🎟️', 30, 90], ['🚙', -100, 40], ['🍜', 50, 68], ['🎬', 75, 68]];
   c.font = `${Math.round(13 * PX)}px system-ui, sans-serif`;
   for (const [e, x, z] of lab) c.fillText(e, wx(x), wz(z));
 }
@@ -1099,7 +1454,7 @@ function update(dt, t) {
   if (keys.KeyW || keys.ArrowUp) jy = 1; if (keys.KeyS || keys.ArrowDown) jy = -1;
   if (keys.KeyA || keys.ArrowLeft) jx = -1; if (keys.KeyD || keys.ArrowRight) jx = 1;
   let mag = Math.min(1, Math.hypot(jx, jy));
-  if (paused || !started) { jx = jy = 0; mag = 0; }
+  if (paused || !started || duduk) { jx = jy = 0; mag = 0; }
   const fwdX = -Math.sin(camYaw), fwdZ = -Math.cos(camYaw), rtX = Math.cos(camYaw), rtZ = -Math.sin(camYaw);
   let mx = fwdX * jy + rtX * jx, mz = fwdZ * jy + rtZ * jx; const ml = Math.hypot(mx, mz);
   const run = keys.ShiftLeft || keys.ShiftRight;
@@ -1136,6 +1491,7 @@ function update(dt, t) {
   dia.group.rotation.y = player.yaw + Math.PI;
   animPerson(dia, partner.phase, Math.min(1, partner.speed / 3));
 
+  if (duduk) posisiDuduk();
   // tangan bergandengan
   kamu.arms[0].pivot.getWorldPosition(tmpA); dia.arms[1].pivot.getWorldPosition(tmpB);
   const hand = tmpV.copy(tmpA).lerp(tmpB, lerp(0.58, 0.5, e));
@@ -1152,9 +1508,12 @@ function update(dt, t) {
   const cpt = Math.cos(pitchT), dX2 = -Math.sin(camYaw) * cpt, dY2 = -Math.sin(pitchT), dZ2 = -Math.cos(camYaw) * cpt;
   const eyeX = player.x + fX * 0.13, eyeY = kamu.eye + kamu.group.position.y, eyeZ = player.z + fZ * 0.13;
   const midX = player.x + rX * 0.37, midZ = player.z + rZ * 0.37;
-  const dist = 5.2;
-  let tX = midX - dX2 * dist, tY = 1.45 - dY2 * dist, tZ = midZ - dZ2 * dist;
+  const dalam = gedungDalam(player.x, player.z);
+  distCam = lerp(distCam, dalam ? 3.0 : 5.2, Math.min(1, dt * 3));
+  const dist = distCam;
+  let tX = midX - dX2 * dist, tY = 1.45 + kamu.group.position.y - dY2 * dist, tZ = midZ - dZ2 * dist;
   tY = Math.max(0.4, tY);
+  if (dalam) { tX = clamp(tX, dalam.x1 + 0.4, dalam.x2 - 0.4); tZ = clamp(tZ, dalam.z1 + 0.4, dalam.z2 - 0.4); tY = Math.min(tY, dalam.h - 0.5); }
   camera.position.set(lerp(eyeX, tX, e), lerp(eyeY, tY, e), lerp(eyeZ, tZ, e));
   const lX = lerp(dX, dX2, e), lY = lerp(dY, dY2, e), lZ = lerp(dZ, dZ2, e);
   camera.lookAt(camera.position.x + lX, camera.position.y + lY, camera.position.z + lZ);
@@ -1164,7 +1523,8 @@ function update(dt, t) {
   sun.position.set(player.x + 40, 70, player.z + 25); sun.target.position.set(player.x, 0, player.z);
 
   // hewan
-  for (const A of animals) updateAnimal(A, dt, t);
+  for (const A of animals) if (A.group.visible) updateAnimal(A, dt, t);
+  updateGedung(dt, t, dalam);
   // jip
   {
     const ahead = kurvaSafari.getPointAt((jip.u + 0.006) % 1);
@@ -1196,9 +1556,9 @@ function update(dt, t) {
     const d = Math.hypot(tmpA.x - player.x, tmpA.z - player.z);
     if (d < it.radius && d < nd) { nd = d; nearest = it; }
   }
-  if (nearest && started && !paused) {
-    const nm = nearest.kind === 'hewan' ? INFO[nearest.data].nama : nearest.kind === 'papan' ? (nearest.data === 'peta' ? 'Peta' : (ZONES.find(z => z.id === nearest.data) || {}).nama) : LANDMARK[nearest.data].nama;
-    ui.aksi.textContent = 'Lihat ' + nm; ui.aksi.classList.remove('sembunyi');
+  if (nearest && started && !paused && !duduk) {
+    const nm = nearest.label ? '' : nearest.kind === 'hewan' ? INFO[nearest.data].nama : nearest.kind === 'papan' ? (nearest.data === 'peta' ? 'Peta' : (ZONES.find(z => z.id === nearest.data) || {}).nama) : LANDMARK[nearest.data].nama;
+    ui.aksi.textContent = nearest.label || ('Lihat ' + nm); ui.aksi.classList.remove('sembunyi');
   } else ui.aksi.classList.add('sembunyi');
 
   // gelembung bicara
@@ -1289,4 +1649,4 @@ function frame() {
 // intro: kamera memutar perlahan di layar mulai
 camYaw = 0;
 frame();
-window.__safari = { player, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { player, npcs, BIOS, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };

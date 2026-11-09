@@ -5,6 +5,9 @@ window.SAFARI = {
   namaGerbang: 'PETUALANGAN SAFARI',
   namaPasangan: 'Dia',
 
+  // Obrolan AI: berapa pesan terakhir yang dikirim ke AI berikutnya (hemat kuota)
+  riwayatAI: 3,
+
   // Warna baju (boleh diganti kode warna lain)
   bajuKamu: '#e8836f',
   bajuPasangan: '#4f7d6b',
@@ -36,6 +39,8 @@ window.SAFARI = {
     beruang: 'Itu beruang madu, ada tanda oranye di dadanya.',
     kemah: 'Kapan-kapan kita kemah di sini ya.',
     panda: 'Pandanya lagi makan bambu. Gemas!',
-    airterjun: 'Dengar suara airnya? Adem banget di sini.'
+    airterjun: 'Dengar suara airnya? Adem banget di sini.',
+    foodcourt: 'Banyak banget pilihannya. Kamu mau makan apa?',
+    bioskop: 'Nonton film yuk, aku yang pilih tempat duduknya.'
   }
 };
