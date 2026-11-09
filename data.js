@@ -17,6 +17,7 @@ window.SAFARI = {
   // Harga (rupiah)
   hargaMakananMin: 15000,      // harga paling murah per porsi di food court
   tiketMasuk: 15000,           // per orang, berlaku sampai keluar taman atau refresh
+  hargaWahana: { bianglala: 20000, roller: 35000, histeria: 30000, komidi: 15000 },   // per orang
   tiketBioskop: 20000,         // per orang
   hargaPopcorn: 25000,
   hargaMinumBioskop: 15000,
@@ -95,6 +96,7 @@ window.SAFARI = {
 
   // Komentar pasangan saat pertama kali masuk sebuah area
   komentarZona: {
+    tamanbermain: 'Wah, taman bermain! Mau naik apa dulu? Bianglala, roller coaster, histeria, atau komidi putar?',
     parkir: 'Sudah sampai! Beli tiket dulu di loket, terus kita masuk lewat gerbang.',
     flamingo: 'Lihat, flamingonya pink semua!',
     gajah: 'Gajahnya besar banget, lihat belalainya.',
