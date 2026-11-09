@@ -54,7 +54,7 @@ progress{width:100%;height:10px}
       <p class="kecil" id="info-maks"></p>
       <div id="daftar"></div>
       <label for="penonton">Jumlah penonton lain di bioskop</label>
-      <input id="penonton" type="number" min="0" max="60" value="40">
+      <input id="penonton" type="number" min="0" max="60" value="24">
       <div class="baris"><button class="utama" id="simpan-pengaturan">Simpan</button></div>
     </div>
 
@@ -86,7 +86,7 @@ progress{width:100%;height:10px}
 const REPO = 'purwoadhii/Liburan', CABANG = 'main', API = 'https://api.github.com/repos/' + REPO + '/contents/';
 const $ = id => document.getElementById(id);
 let token = localStorage.getItem('liburan_token') || '';
-let data = { penonton: 40, daftar: [] }, shaFilm = null, editIdx = -1;
+let data = { penonton: 24, daftar: [] }, shaFilm = null, editIdx = -1;
 
 function status(t, ms = 3000) { const s = $('status'); s.textContent = t; s.style.display = 'block'; clearTimeout(status.t); if (ms) status.t = setTimeout(() => s.style.display = 'none', ms); }
 async function gh(path, opt = {}) {
@@ -124,10 +124,10 @@ async function muat() {
   if (f) {
     const teks = utf8b64(f.content);
     const m = teks.match(/window\.FILM\s*=\s*([\s\S]*?);\s*$/);
-    try { data = JSON.parse(m[1]); } catch (e) { data = { penonton: 40, daftar: [] }; }
+    try { data = JSON.parse(m[1]); } catch (e) { data = { penonton: 24, daftar: [] }; }
   }
   data.daftar = data.daftar || [];
-  $('penonton').value = data.penonton != null ? data.penonton : 40;
+  $('penonton').value = data.penonton != null ? data.penonton : 24;
   tampil();
 }
 function tampil() {

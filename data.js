@@ -50,7 +50,7 @@ window.SAFARI = {
     bison: 'Bison itu kuat, lihat punuknya.',
     jerapah: 'Lehernya tinggi sekali. Coba kasih wortel!',
     zebra: 'Belangnya rapi ya, kayak garis-garis bajumu.',
-    babyzoo: 'Ada kelinci dan kambing kecil. Lucu!',
+    babyzoo: 'Ada kelinci kecil. Lucu!',
     rekreasi: 'Naik bianglala nanti sore yuk.',
     harimau: 'Harimaunya lagi jalan-jalan juga, kayak kita.',
     beruang: 'Itu beruang madu, ada tanda oranye di dadanya.',

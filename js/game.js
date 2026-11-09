@@ -703,8 +703,7 @@ spawn('unta', 'unta', 3);
 spawn('bison', 'bison', 4);
 spawn('jerapah', 'jerapah', 4);
 spawn('zebra', 'zebra', 6);
-spawn('kelinci', 'babyzoo', 5);
-spawn('kambing', 'babyzoo', 4);
+spawn('kelinci', 'babyzoo', 7);
 spawn('harimau', 'harimau', 2);
 spawn('beruang', 'beruang', 2);
 spawn('panda', 'panda', 2);
@@ -824,9 +823,42 @@ const WARNA_BAJU = ['#5aa7dc', '#e8836f', '#6aa64e', '#f2d14b', '#d98ad6', '#fff
 const WARNA_CELANA = ['#2f3a4f', '#3b3b46', '#c9b28a', '#5a4a3a', '#7d8a99'];
 const WARNA_RAMBUT = ['#221712', '#3b2417', '#1a1a1a', '#5a3b2a'];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
+// gabungkan banyak bagian tubuh jadi satu mesh berwarna (lebih ringan di HP)
+const mVertex = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+const _inv = new THREE.Matrix4(), _rel = new THREE.Matrix4(), _c = new THREE.Color();
+function gabung(meshes, ke) {
+  if (!meshes.length) return null;
+  ke.updateMatrixWorld(true); _inv.copy(ke.matrixWorld).invert();
+  const pos = [], nor = [], col = [];
+  for (const m of meshes) {
+    m.updateMatrixWorld(true); _rel.multiplyMatrices(_inv, m.matrixWorld);
+    let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+    g.applyMatrix4(_rel);
+    const pa = g.attributes.position.array, na = g.attributes.normal.array;
+    _c.copy(m.material.color);
+    for (let i = 0; i < pa.length; i++) { pos.push(pa[i]); nor.push(na[i]); }
+    for (let i = 0; i < pa.length / 3; i++) col.push(_c.r, _c.g, _c.b);
+    g.dispose();
+    m.parent.remove(m);
+  }
+  const bg = new THREE.BufferGeometry();
+  bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  bg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  bg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const out = new THREE.Mesh(bg, mVertex); ke.add(out);
+  return out;
+}
+function ringankan(P) {
+  P.group.updateMatrixWorld(true);
+  for (const leg of P.legs) gabung(leg.children.filter(c => c.isMesh), leg);
+  for (const a of P.arms) { gabung([...a.inner.children.filter(c => c.isMesh), a.hand], a.pivot); a.hand = new THREE.Object3D(); }
+  for (const h of P.headParts) { const ms = []; h.traverse(o => { if (o.isMesh) ms.push(o); }); gabung(ms, h); }
+  gabung(P.group.children.filter(c => c.isMesh), P.group);
+}
 function buatNpc(posisi, opsi = {}) {
   const cewek = opsi.cewek != null ? opsi.cewek : Math.random() < 0.5;
   const P = makePerson(cewek, { npc: true, ...opsi, baju: opsi.baju || pick(WARNA_BAJU), celana: opsi.celana || (cewek ? (Math.random() < 0.5 ? null : pick(WARNA_CELANA)) : pick(WARNA_CELANA)), rambut: pick(WARNA_RAMBUT), kulit: pick(['#f1c7a5', '#d9a57d', '#c68e64', '#e8b98f']) });
+  ringankan(P);
   P.group.position.set(posisi[0], 0, posisi[1]);
   for (const a of P.arms) swingArm(a, 0, 1);
   const N = { P, x: posisi[0], z: posisi[1], yaw: 0, jalur: [], phase: Math.random() * 6, duduk: false, speed: rand(1.1, 1.5) };
@@ -931,13 +963,13 @@ let pesanan = [];
   }
   // pengunjung yang sedang makan
   MEJA.forEach((m, i) => {
-    for (const k of m.kursiU) if (Math.random() < 0.6) { const N = npcGedung(buatNpc([k.x, k.z]), 'fc'); npcDuduk(N, k.x, k.z, Math.PI); N.makan = true; N.makanSisa = rand(10, 70); N.kursiFC = k; k.n = N; }
+    for (const k of m.kursiU) if (Math.random() < 0.3) { const N = npcGedung(buatNpc([k.x, k.z]), 'fc'); npcDuduk(N, k.x, k.z, Math.PI); N.makan = true; N.makanSisa = rand(10, 70); N.kursiFC = k; k.n = N; }
     if (i === 4) return;
-    if (Math.random() < 0.3) { m.penuh = true; for (const sx of [-0.45, 0.45]) { const N = npcGedung(buatNpc([m.x + sx, m.z + 0.85]), 'fc'); npcDuduk(N, m.x + sx, m.z + 0.85, 0); N.makan = true; } }
+    if (Math.random() < 0.1) { m.penuh = true; for (const sx of [-0.45, 0.45]) { const N = npcGedung(buatNpc([m.x + sx, m.z + 0.85]), 'fc'); npcDuduk(N, m.x + sx, m.z + 0.85, 0); N.makan = true; } }
     if (Math.random() < 0.5) mesh(cyl(0.16, 0.12, 0.1, 8), '#f8f4ea', m.x, 0.85, m.z - 0.2, scene, false);
   });
   // pengunjung yang berjalan di dalam
-  for (let i = 0; i < 3; i++) { const N = npcGedung(buatNpc([rand(44, 56), rand(63, 76)]), 'fc'); N.keliling = fc; }
+  for (let i = 0; i < 2; i++) { const N = npcGedung(buatNpc([rand(44, 56), rand(63, 76)]), 'fc'); N.keliling = fc; }
 }
 
 /* ---------- bioskop ---------- */
@@ -984,7 +1016,7 @@ const ANTRIAN = [];
 const FC_PINTU = [50, 79.2];
 let antriPemain = null;
 function buatAntrian(pos, dir, jenis, data, target) {
-  const q = { pos, dir, jenis, data, list: [], layan: 0, target, dasar: target + 1, waktuLayan: rand(3.5, 6) };
+  const q = { pos, dir, jenis, data, list: [], layan: 0, target, dasar: target, waktuLayan: rand(3.5, 6) };
   ANTRIAN.push(q); return q;
 }
 const slotAntri = (q, n) => [q.pos[0] + q.dir[0] * n * 0.95, q.pos[1] + q.dir[1] * n * 0.95];
@@ -1020,6 +1052,7 @@ function selesaiLayan(q, N) {
 }
 function updateAntrian(dt) {
   for (const q of ANTRIAN) {
+    if (Math.hypot(q.pos[0] - player.x, q.pos[1] - player.z) > 45) continue;
     const npcN = q.list.filter(m => m !== 'pemain').length;
     if (npcN < q.target && Math.random() < dt * 0.25) spawnAntri(q);
     if (npcN > q.target + 1 && q.list.length && q.list[q.list.length - 1] !== 'pemain' && Math.random() < dt * 0.05) { const N = q.list.pop(); N.antri = null; N.jalur = q.jenis === 'kios' ? [FC_PINTU, [rand(40, 85), 88]] : [[rand(52, 84), 89]]; N.pergi = true; }
@@ -1078,11 +1111,11 @@ function gerakAntri(dt) {
 // antrean tiap kios & loket tiket
 KIOS.forEach((k, i) => {
   const dx = k.depan[0] - k.posisi[0], dz = k.depan[1] - k.posisi[1], L = Math.hypot(dx, dz);
-  k.antrian = buatAntrian(k.depan, [dx / L, dz / L], 'kios', i, 1 + Math.floor(Math.random() * 3));
+  k.antrian = buatAntrian(k.depan, [dx / L, dz / L], 'kios', i, Math.random() < 0.5 ? 1 : (Math.random() < 0.6 ? 0 : 2));
   for (let n = 0; n < k.antrian.target; n++) { const [x, z] = slotAntri(k.antrian, n); const N = npcGedung(buatNpc([x, z]), 'fc'); N.x = x; N.z = z; N.yaw = arahAntri(k.antrian); tambahKeAntrian(k.antrian, N); }
 });
-BIOS.antrian = buatAntrian([72.5, 84.7], [0, 1], 'tiket', null, 4);
-for (let n = 0; n < 4; n++) { const [x, z] = slotAntri(BIOS.antrian, n); const N = npcGedung(buatNpc([x, z]), 'bios'); N.x = x; N.z = z; tambahKeAntrian(BIOS.antrian, N); }
+BIOS.antrian = buatAntrian([72.5, 84.7], [0, 1], 'tiket', null, 2);
+for (let n = 0; n < 2; n++) { const [x, z] = slotAntri(BIOS.antrian, n); const N = npcGedung(buatNpc([x, z]), 'bios'); N.x = x; N.z = z; tambahKeAntrian(BIOS.antrian, N); }
 $('btn-antri').onclick = () => { keluarAntrian(); hint('Kalian keluar dari antrean.'); };
 
 /* ---------- lihat hidangan dari dekat ---------- */
@@ -1508,7 +1541,7 @@ function mulaiFilm(f) {
   setTimeout(() => bicara(pick(['Filmnya kayaknya seru.', 'Kamu mau popcorn?', 'Aku suka nonton bareng kamu.'])), 1500);
   // penonton lain
   const kosong = BIOS.kursi.filter(k => !k.terisi).sort(() => Math.random() - 0.5);
-  const jumlah = Math.min(kosong.length, F.penonton != null ? F.penonton : 40);
+  const jumlah = Math.min(kosong.length, F.penonton != null ? F.penonton : 24);
   for (let i = 0; i < jumlah; i++) {
     const k = kosong[i]; k.terisi = true;
     const N = buatNpc([rand(62, 74), rand(84, 88.5)]); N.speed = rand(1.6, 2);
@@ -1553,6 +1586,7 @@ function updateGedung(dt, t, dalam) {
   // penonton & pengunjung
   for (let i = npcs.length - 1; i >= 0; i--) {
     const N = npcs[i]; if (N.local) { continue; }
+    if (N.vis === false && !N.pelayan && !N.bioskop) { N.P.group.visible = false; continue; }
     if (N.tunda > 0) { N.tunda -= dt; N.P.group.visible = false; continue; }
     N.P.group.visible = N.vis !== false;
     let moving = false;
@@ -1597,8 +1631,20 @@ function updateGedung(dt, t, dalam) {
   cullT -= dt;
   if (cullT <= 0) {
     cullT = 0.4;
-    for (const A of animals) A.group.visible = Math.hypot(A.group.position.x - player.x, A.group.position.z - player.z) < 120;
-    for (const N of npcs) if (!N.local) N.vis = N.libur ? false : N.gedung ? Math.hypot((N.gedung === 'fc' ? 50 : 75) - player.x, (N.gedung === 'fc' ? 72 : 74) - player.z) < 38 : Math.hypot(N.x - player.x, N.z - player.z) < 60;
+    // hanya area di sekitar kalian yang ditampilkan & dijalankan
+    const di = gedungDalam(player.x, player.z), luar = !di;
+    for (const A of animals) A.group.visible = luar && Math.hypot(A.group.position.x - player.x, A.group.position.z - player.z) < 75;
+    AVI.aktif = luar && Math.hypot(player.x - AVI.x, player.z - AVI.z) < 70;
+    if (AVI.group) AVI.group.visible = AVI.aktif;
+    for (const B of burung) B.g.visible = AVI.aktif; for (const M of merak) M.g.visible = AVI.aktif;
+    jip.group.visible = luar;
+    const kodeDi = di ? (di.id === 'foodcourt' ? 'fc' : 'bios') : null;
+    for (const N of npcs) {
+      if (N.local) { if (N.P.group.parent) N.P.group.parent.visible = luar || kodeDi === 'fc'; continue; }
+      if (N.libur) N.vis = false;
+      else if (N.gedung) N.vis = (!kodeDi || kodeDi === N.gedung) && Math.hypot((N.gedung === 'fc' ? 50 : 75) - player.x, (N.gedung === 'fc' ? 72 : 74) - player.z) < 40;
+      else N.vis = luar && Math.hypot(N.x - player.x, N.z - player.z) < 55;
+    }
   }
 }
 
@@ -1617,7 +1663,7 @@ function rencanaJalan(N) {
 }
 {
   const total = jalurJalan.reduce((a, r) => a + r.pts.length, 0);
-  for (let i = 0; i < (F.pengunjung || 28); i++) {
+  for (let i = 0; i < (F.pengunjung || 12); i++) {
     let r = Math.random() * total, J = jalurJalan[0];
     for (const x of jalurJalan) { if (r < x.pts.length) { J = x; break; } r -= x.pts.length; }
     const idx = Math.floor(Math.random() * J.pts.length), p0 = J.pts[idx];
@@ -1667,7 +1713,7 @@ const AVI = { x: 76, z: -50, r: 10, h: 7.2 };
 const burung = [];
 {
   const { x: ax, z: az, r: R, h: H } = AVI;
-  const g = new THREE.Group(); g.position.set(ax, 0, az); scene.add(g);
+  const g = new THREE.Group(); g.position.set(ax, 0, az); scene.add(g); AVI.group = g;
   const pintuA = -Math.PI / 2, celah = 0.26; // pintu menghadap barat
   const tBatu = tex(256, 64, (c, w, h) => {
     c.fillStyle = '#4a4a46'; c.fillRect(0, 0, w, h);
@@ -1809,7 +1855,7 @@ for (let i = 0; i < 2; i++) {
   merak.push(M); addInteract(g, 'hewan', 'merak', 0);
 }
 function updateBurung(dt, t) {
-  if (Math.hypot(player.x - AVI.x, player.z - AVI.z) > 90) return;
+  if (!AVI.aktif) return;
   for (const B of burung) {
     B.fase += dt * (B.hinggap > 0 ? 2 : 22);
     if (B.hinggap > 0) {
@@ -1876,7 +1922,7 @@ const ZONES = [
   { id: 'jalan', nama: 'Jalan Utama', x: 14, z: -40, r: 400 }
 ];
 const SPES_ZONA = { flamingo: 'flamingo', gajah: 'gajah', singa: 'singa', unta: 'unta', bison: 'bison', jerapah: 'jerapah', zebra: 'zebra', babyzoo: 'kelinci', burung: 'makaw', harimau: 'harimau', beruang: 'beruang', panda: 'panda' };
-for (const z of ZONES) if (z.sign) { const sp = INFO[SPES_ZONA[z.id]]; papanZona(z.sign[0], z.sign[1], z.sign[2], z.nama.replace('Zona ', ''), sp ? sp.emoji + ' ' + (z.id === 'babyzoo' ? 'kelinci & kambing' : '') : '', z.id); }
+for (const z of ZONES) if (z.sign) { const sp = INFO[SPES_ZONA[z.id]]; papanZona(z.sign[0], z.sign[1], z.sign[2], z.nama.replace('Zona ', ''), sp ? sp.emoji + ' ' + (z.id === 'babyzoo' ? 'kelinci' : '') : '', z.id); }
 papanZona(22, 80, 0, 'Peta Taman', 'Ketuk untuk lihat', 'peta');
 addInteract(airTerjunMesh, 'landmark', 'airterjun', 22);
 
@@ -1973,7 +2019,7 @@ function openInter(it) {
   if (it.kind === 'papan' && it.data === 'peta') { bukaPeta(); return; }
   let info, key;
   if (it.kind === 'hewan') { key = it.data; info = INFO[key]; }
-  else if (it.kind === 'papan') { key = SPES_ZONA[it.data]; info = INFO[key]; if (!info) return; if (it.data === 'babyzoo') info = { nama: 'Kebun Binatang Mini', emoji: '🐰🐐', fakta: [...INFO.kelinci.fakta, ...INFO.kambing.fakta], makan: true }; }
+  else if (it.kind === 'papan') { key = SPES_ZONA[it.data]; info = INFO[key]; if (!info) return; if (it.data === 'babyzoo') info = { nama: 'Kebun Binatang Mini', emoji: '🐰', fakta: [...INFO.kelinci.fakta], makan: true }; }
   else if (it.kind === 'kios') { if (antriPemain) { hint('Kalian sedang antre.'); return; } tawarAntri(KIOS[it.data].antrian, () => bukaKios(it.data), KIOS[it.data].emoji + ' ' + KIOS[it.data].nama); return; }
   else if (it.kind === 'meja') { if (it.data.penuh) { hint('Meja ini penuh. Cari meja lain yang kosong ya.'); return; } dudukMeja(it.data); return; }
   else if (it.kind === 'bioskop') { if (antriPemain) { hint('Kalian sedang antre.'); return; } if (it.obj === BIOS.layar) bukaFilm(); else tawarAntri(BIOS.antrian, bukaFilm, '🎟️ Loket Tiket'); return; }
@@ -2361,4 +2407,4 @@ function frame() {
 // intro: kamera memutar perlahan di layar mulai
 camYaw = 0;
 frame();
-window.__safari = { player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
