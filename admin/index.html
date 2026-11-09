@@ -45,10 +45,12 @@ progress{width:100%;height:10px}
     <label for="token">Token GitHub</label>
     <input id="token" type="password" autocomplete="off" placeholder="github_pat_...">
     <small>Buat token <i>fine-grained</i> di GitHub → Settings → Developer settings → Personal access tokens, khusus repo Liburan, izin <b>Contents: Read and write</b>. Token hanya disimpan di browser ini.</small>
-    <div class="baris"><button class="utama" id="masuk">Masuk</button><button id="keluar" class="sembunyi">Keluar</button></div>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input id="ingat" type="checkbox" style="width:auto" checked> Ingat token di browser ini</label>
+    <div class="baris"><button class="utama" id="masuk">Masuk</button></div>
   </div>
 
   <div id="isi" class="sembunyi">
+    <div class="baris" style="justify-content:space-between"><span class="kecil">✅ Sudah masuk</span><span><button id="muat-ulang">Muat ulang</button> <button id="keluar">Keluar</button></span></div>
     <p class="kecil">Ada 3 tempat film. Isi judulnya, lalu tekan <b>Simpan film</b> di masing-masing kotak. Video dan poster boleh menyusul.</p>
     <div id="slot"></div>
     <div class="kartu">
@@ -215,14 +217,16 @@ async function masuk() {
   status('Memeriksa…', 0);
   try {
     await muat();
-    localStorage.setItem('liburan_token', token);
-    $('isi').classList.remove('sembunyi'); $('keluar').classList.remove('sembunyi'); $('masuk').textContent = 'Muat ulang';
+    if ($('ingat').checked) localStorage.setItem('liburan_token', token); else localStorage.removeItem('liburan_token');
+    $('isi').classList.remove('sembunyi'); $('k-masuk').classList.add('sembunyi');
     status('Berhasil masuk.');
   } catch (er) { status('Gagal masuk: ' + er.message, 6000); }
 }
 $('masuk').onclick = masuk;
-$('keluar').onclick = () => { localStorage.removeItem('liburan_token'); token = ''; $('token').value = ''; $('isi').classList.add('sembunyi'); $('keluar').classList.add('sembunyi'); $('masuk').textContent = 'Masuk'; };
-if (token) { $('token').value = token; masuk(); }
+$('keluar').onclick = () => { localStorage.removeItem('liburan_token'); token = ''; $('token').value = ''; $('isi').classList.add('sembunyi'); $('k-masuk').classList.remove('sembunyi'); };
+$('muat-ulang').onclick = () => muat().then(() => status('Daftar film dimuat ulang.')).catch(er => status('Gagal: ' + er.message, 6000));
+$('token').onkeydown = e => { if (e.key === 'Enter') masuk(); };
+if (token) { $('token').value = token; $('k-masuk').classList.add('sembunyi'); masuk().then(() => { if (!$('isi').classList.contains('sembunyi')) return; $('k-masuk').classList.remove('sembunyi'); }); }
 </script>
 </body>
 </html>
