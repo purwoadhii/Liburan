@@ -6,7 +6,7 @@ window.FILM = {
       "judul": "Tester",
       "sinopsis": "",
       "poster": "",
-      "video": "film/tester-mwa6t365.mp4",
+      "video": "film/tester-mwa6u1ir.mp4",
       "youtube": ""
     },
     {
