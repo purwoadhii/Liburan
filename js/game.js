@@ -3747,29 +3747,15 @@ function updateKunang(dt, t) {
 
 // ---- kenangan di layar bioskop setelah film selesai ----
 const KEN = { sudah: false, aktif: false };
-function adaKenangan() { const k = KJ.kenangan || {}; return !!((k.foto && k.foto.length) || k.video || (k.pesan && String(k.pesan).trim())); }
+function adaKenangan() { const k = KJ.kenangan || {}; return !!(k.pesan && String(k.pesan).trim()); }
 function layarTeks(baris, sub) { BIOS.layarMat.map = textTex(baris, { w: 1024, h: 440, size: 54, size2: 40, bg: '#1d1626', border: '#1d1626' }); BIOS.layarMat.needsUpdate = true; }
 function mulaiKenangan() {
   if (KEN.sudah || !adaKenangan() || !(duduk && duduk.bioskop)) return false;
   KEN.sudah = true; KEN.aktif = true; BIOS.status = 'putar';
   if (BIOS.video) { BIOS.video.pause(); }
-  hint('Eh, masih ada yang diputar di layar… 💞', 3500);
+  hint('Eh, masih ada pesan di layar… 💞', 3500);
   const k = KJ.kenangan, langkah = [];
   langkah.push(cb => { layarTeks(['Kenangan Kita 💞']); setTimeout(cb, 3500); });
-  if (k.video) langkah.push(cb => {
-    const v = siapkanVideo(k.video); KEN.v = v; const vt = new THREE.VideoTexture(v); vt.colorSpace = THREE.SRGBColorSpace; KEN.vt = vt;
-    BIOS.layarMat.map = vt; BIOS.layarMat.needsUpdate = true;
-    v.onended = () => { vt.dispose(); KEN.v = null; cb(); }; v.onerror = () => cb();
-    v.play().catch(() => { hint('Ketuk layar untuk memutar video kenangan.', 3000); setTimeout(cb, 4000); });
-  });
-  for (const src of (k.foto || [])) langkah.push(cb => {
-    const img = new Image(); img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      BIOS.layarMat.map = tex(1024, 440, (c, w, h) => { c.fillStyle = '#100c14'; c.fillRect(0, 0, w, h); const s = Math.min(w / img.width, h / img.height); const iw = img.width * s, ih = img.height * s; c.drawImage(img, (w - iw) / 2, (h - ih) / 2, iw, ih); });
-      BIOS.layarMat.needsUpdate = true; setTimeout(cb, 4500);
-    };
-    img.onerror = () => cb(); img.src = src;
-  });
   if (k.pesan && String(k.pesan).trim()) langkah.push(cb => {
     BIOS.layarMat.map = tex(1024, 440, (c, w, h) => {
       c.fillStyle = '#1d1626'; c.fillRect(0, 0, w, h); c.fillStyle = '#ffe9f1'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '600 40px Fredoka, system-ui, sans-serif';
@@ -3784,7 +3770,7 @@ function mulaiKenangan() {
     if (!KEN.aktif) return;
     if (i < langkah.length) { langkah[i++](lanjut); return; }
     KEN.aktif = false;
-    setTimeout(() => bicara('Makasih ya untuk semua kenangan ini. 💞', 5), 300);
+    setTimeout(() => bicara('Makasih ya sudah nonton bareng aku. 💞', 5), 300);
     setTimeout(() => { if (duduk && duduk.bioskop) berdiri(); }, 4000);
   };
   lanjut();
