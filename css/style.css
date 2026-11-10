@@ -14,7 +14,7 @@ button,a.utama{font:inherit;cursor:pointer;border:0}
 #zona{position:absolute;left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));background:var(--kaca);
   padding:7px 14px;border-radius:999px;box-shadow:var(--bayang);font-weight:500;font-size:15px;max-width:55vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #kanan-atas{position:absolute;right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));display:flex;gap:8px;align-items:flex-start}
-#minimap{width:108px;height:108px;border-radius:50%;box-shadow:var(--bayang);border:3px solid var(--krem);background:#7fb069;cursor:pointer}
+#minimap{display:none!important;width:108px;height:108px;border-radius:50%;box-shadow:var(--bayang);border:3px solid var(--krem);background:#7fb069;cursor:pointer}
 .tombol-kolom{display:flex;flex-direction:column;gap:8px}
 .tbl{min-width:46px;height:42px;border-radius:14px;background:var(--kaca);box-shadow:var(--bayang);font-size:17px;padding:0 10px;color:var(--teks)}
 .tbl b{font-size:13px;font-weight:600}

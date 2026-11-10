@@ -3489,7 +3489,7 @@ function update(dt, t) {
     const dw = Math.hypot(player.x - AIR_TERJUN.x, player.z - AIR_TERJUN.z);
     airGain.gain.value = clamp(1 - (dw - 12) / 70, 0, 1) * 0.35;
   }
-  if (started) gambarMini();
+  // peta kecil dihapus: peta dilihat di papan informasi
 }
 
 function updateAnimal(A, dt, t) {
