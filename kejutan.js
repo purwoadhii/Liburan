@@ -10,11 +10,6 @@ window.KEJUTAN = {
   },
   "jerapah": "Bunga ini dari jerapah. Katanya, kamu cantik sekali hari ini 🌸",
   "kunang": "I ❤ U",
-  "kenangan": {
-    "pesan": "Terima kasih sudah menemani setiap hari. Semoga kita selalu bersama 💞",
-    "foto": [],
-    "video": ""
-  },
   "ultah": {
     "aktif": true,
     "nama": "Elsa Laila F",

@@ -76,8 +76,6 @@ progress{width:100%;height:10px}
       <h3>✨ Kunang-kunang di air terjun <small>(malam, 21.00–02.00)</small></h3>
       <label>Tulisan</label><input id="kj-kunang" maxlength="30" placeholder="I ❤ U">
       <small>Singkat saja supaya terbaca, misalnya nama atau I ❤ U. Pakai tanda | untuk 2 baris, contoh: Selamat|Ulang Tahun</small>
-      <h3>🎞️ Pesan di layar bioskop <small>(tampil setelah film selesai)</small></h3>
-      <label>Pesan penutup</label><textarea id="kj-pesan" maxlength="500"></textarea>
       <h3>🎂 Kue ulang tahun <small>(dibawa pelayan saat menunggu pesanan makanan)</small></h3>
       <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input id="kj-ultah-aktif" type="checkbox" style="width:auto"> Aktifkan kejutan kue ulang tahun</label>
       <label>Nama yang berulang tahun</label><input id="kj-ultah-nama" maxlength="40">
@@ -264,18 +262,17 @@ $('simpan-pengaturan').onclick = async () => {
 
 // ---------- kejutan ----------
 let kj = {};
-const KJ_AWAL = { kelinci: { judul: '', isi: '' }, gajah: { judul: '', isi: '' }, jerapah: '', kunang: '', kenangan: { pesan: '', foto: [], video: '' }, ultah: { aktif: true, nama: '', ucapan: '', kataPasangan: '', lagu: '' }, lamaran: { aktif: true, ajak: '', kata: '', suara: '', tidak: '', terima: '', suaraTerima: '', loveTeks: '', loveBawah: '' } };
+const KJ_AWAL = { kelinci: { judul: '', isi: '' }, gajah: { judul: '', isi: '' }, jerapah: '', kunang: '', ultah: { aktif: true, nama: '', ucapan: '', kataPasangan: '', lagu: '' }, lamaran: { aktif: true, ajak: '', kata: '', suara: '', tidak: '', terima: '', suaraTerima: '', loveTeks: '', loveBawah: '' } };
 async function muatKejutan() {
   const f = await gh('kejutan.js');
   kj = JSON.parse(JSON.stringify(KJ_AWAL));
-  if (f) { const m = utf8b64(f.content).match(/window\.KEJUTAN\s*=\s*([\s\S]*?);\s*$/); try { const d = JSON.parse(m[1]); kj = { ...kj, ...d, kelinci: { ...kj.kelinci, ...(d.kelinci || {}) }, gajah: { ...kj.gajah, ...(d.gajah || {}) }, kenangan: { ...kj.kenangan, ...(d.kenangan || {}) }, ultah: { ...kj.ultah, ...(d.ultah || {}) }, lamaran: { ...kj.lamaran, ...(d.lamaran || {}) } }; } catch (e) {} }
+  if (f) { const m = utf8b64(f.content).match(/window\.KEJUTAN\s*=\s*([\s\S]*?);\s*$/); try { const d = JSON.parse(m[1]); kj = { ...kj, ...d, kelinci: { ...kj.kelinci, ...(d.kelinci || {}) }, gajah: { ...kj.gajah, ...(d.gajah || {}) }, ultah: { ...kj.ultah, ...(d.ultah || {}) }, lamaran: { ...kj.lamaran, ...(d.lamaran || {}) } }; } catch (e) {} }
   tampilKejutan();
 }
 function tampilKejutan() {
   $('kj-kelinci-judul').value = kj.kelinci.judul || ''; $('kj-kelinci-isi').value = kj.kelinci.isi || '';
   $('kj-gajah-judul').value = kj.gajah.judul || ''; $('kj-gajah-isi').value = kj.gajah.isi || '';
   $('kj-jerapah').value = kj.jerapah || ''; $('kj-kunang').value = kj.kunang || '';
-  $('kj-pesan').value = kj.kenangan.pesan || '';
   $('kj-ultah-aktif').checked = kj.ultah.aktif !== false; $('kj-ultah-nama').value = kj.ultah.nama || '';
   $('kj-ultah-ucapan').value = kj.ultah.ucapan || ''; $('kj-ultah-kata').value = kj.ultah.kataPasangan || '';
   const L = kj.lamaran;
@@ -286,7 +283,6 @@ function tampilKejutan() {
     const b = $(id).querySelector('button'); if (b) b.onclick = () => { KJ_HAPUS.push(L[k]); L[k] = ''; tampilKejutan(); status('Suara dihapus. Tekan Simpan kejutan untuk menyimpan.', 4000); };
   }
   for (const id of ['kj-lagu', 'kj-lamar-suara', 'kj-lamar-suara2']) $(id).value = '';
-  if ((kj.kenangan.foto || []).length || kj.kenangan.video) { KJ_HAPUS.push(...(kj.kenangan.foto || []), kj.kenangan.video); kj.kenangan.foto = []; kj.kenangan.video = ''; }
   $('kj-lagu-ada').innerHTML = kj.ultah.lagu ? `<audio controls src="../${esc(kj.ultah.lagu)}" style="width:100%;margin-top:4px"></audio><button id="kj-lagu-hapus" class="hapus" style="padding:4px 12px;margin-top:6px">Hapus backsound</button>` : 'Belum ada backsound. Tanpa backsound, game memutar melodi selamat ulang tahun sederhana.';
   if ($('kj-lagu-hapus')) $('kj-lagu-hapus').onclick = () => { KJ_HAPUS.push(kj.ultah.lagu); kj.ultah.lagu = ''; tampilKejutan(); status('Backsound dihapus. Tekan Simpan kejutan untuk menyimpan.', 4000); };
 }
@@ -306,7 +302,7 @@ $('kj-simpan').onclick = async () => {
     kj.kelinci = { judul: $('kj-kelinci-judul').value.trim(), isi: $('kj-kelinci-isi').value.trim() };
     kj.gajah = { judul: $('kj-gajah-judul').value.trim(), isi: $('kj-gajah-isi').value.trim() };
     kj.jerapah = $('kj-jerapah').value.trim(); kj.kunang = $('kj-kunang').value.trim();
-    kj.kenangan.pesan = $('kj-pesan').value.trim();
+    delete kj.kenangan;
     kj.ultah = { ...kj.ultah, aktif: $('kj-ultah-aktif').checked, nama: $('kj-ultah-nama').value.trim(), ucapan: $('kj-ultah-ucapan').value.trim(), kataPasangan: $('kj-ultah-kata').value.trim() };
     const lf = $('kj-lagu').files[0];
     if (lf) {
