@@ -17,7 +17,11 @@ window.FILM = {
       "youtube": ""
     },
     {
-      "judul": ""
+      "judul": "testter 3",
+      "sinopsis": "",
+      "poster": "",
+      "video": "film/testter-3-mwa7avrl.mp4",
+      "youtube": ""
     }
   ]
 };
