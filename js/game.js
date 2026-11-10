@@ -2062,8 +2062,17 @@ function putarFilm() {
   nanti(() => { $('intro').classList.add('sembunyi'); $('yt').classList.remove('intro'); mulaiPutarFilm(penuh); }, ms + 850);
 }
 // pindah cara nonton saat film diputar: layar bioskop 3D <-> layar penuh (hanya video upload / link)
+const sedangNonton = () => !!(duduk && duduk.bioskop && BIOS.status === 'putar' && $('yt').classList.contains('sembunyi'));
+putar.push(() => document.body.classList.toggle('nonton', sedangNonton()));
 function aturLayar(penuh) {
-  const v = BIOS.video; if (!v || BIOS.status !== 'putar') return;
+  if (BIOS.status !== 'putar') return;
+  const v = BIOS.video;
+  if (!v) {   // film judul saja
+    if (BIOS.yt) return;
+    if (penuh && BIOS.film) { $('film-judul').textContent = '🎬 ' + BIOS.film.judul; $('film-judul').classList.remove('sembunyi'); $('yt-frame').style.display = 'none'; $('film-3d').classList.remove('sembunyi'); $('yt').classList.remove('sembunyi'); }
+    else { $('yt').classList.add('sembunyi'); $('film-3d').classList.add('sembunyi'); }
+    return;
+  }
   BIOS.cara = penuh ? 'penuh' : '3d';
   if (penuh) { v.controls = true; $('film-tempat').appendChild(v); $('film-3d').classList.remove('sembunyi'); $('yt').classList.remove('sembunyi'); $('btn-putar').classList.add('sembunyi'); $('btn-layar').classList.add('sembunyi'); }
   else { $('film-simpan').appendChild(v); $('yt').classList.add('sembunyi'); $('film-3d').classList.add('sembunyi'); $('btn-putar').classList.remove('sembunyi'); $('btn-putar').textContent = v.paused ? '▶' : '⏸'; $('btn-layar').classList.remove('sembunyi'); }
@@ -2584,6 +2593,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 const ray = new THREE.Raycaster();
 function tapAt(cx, cy) {
+  if (sedangNonton()) { aturLayar(true); return; }   // saat nonton di layar 3D: ketuk = layar membesar jadi popup
   ray.setFromCamera(new THREE.Vector2(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1), camera);
   ray.far = 45;
   const hits = ray.intersectObjects(interactables.map(i => i.obj), true);
