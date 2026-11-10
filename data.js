@@ -37,6 +37,13 @@ window.SAFARI = {
   hargaJip: 10000,
   putaranJip: 60,
   berhentiJip: 4,
+  // Shuttle malam Terminal ⇄ Air Terjun (lewat jalan utama): harga per orang, jam mulai & selesai (jam taman),
+  // lama sekali jalan (menit taman) dan lama berhenti di tiap stasiun (menit taman).
+  hargaShuttle: 10000,
+  jamMulaiShuttle: 20.75,
+  jamSelesaiShuttle: 2.5,
+  jalanShuttle: 8,
+  berhentiShuttle: 4,
   // Pakan di booth sebelah kandang: [nama, harga per porsi]
   pakanHewan: {
     kelinci: [['Wortel', 10000], ['Kangkung', 12000]],
