@@ -3637,7 +3637,65 @@ function taruhSurat(obj, x, z, data) {
 function bukaSurat(d) {
   const noda = d.lumpur ? Array.from({ length: 7 }, () => `<span style="position:absolute;left:${rand(2, 88)}%;top:${rand(2, 88)}%;width:${rand(18, 46)}px;height:${rand(12, 30)}px;border-radius:50%;background:#6b4a2b;opacity:${rand(0.25, 0.5).toFixed(2)};transform:rotate(${rand(0, 180) | 0}deg)"></span>`).join('') : '';
   const isi = escH(d.isi).replace(/\n/g, '<br>');
-  kartu('💌', d.judul, `<div style="position:relative;overflow:hidden;background:repeating-linear-gradient(#fffaf0 0 27px,#e9dfc9 27px 28px);border-radius:12px;padding:16px 16px 18px;font-size:17px;line-height:28px;color:#3a2f25;box-shadow:inset 0 0 0 2px #e2d6bb">${noda}<div style="position:relative">${isi}</div></div>`);
+  kartu('💌', d.judul, `<div style="position:relative;overflow:hidden;background:repeating-linear-gradient(#fffaf0 0 27px,#e9dfc9 27px 28px);border-radius:12px;padding:16px 16px 18px;font-size:17px;line-height:28px;color:#3a2f25;box-shadow:inset 0 0 0 2px #e2d6bb">${noda}<div style="position:relative">${isi}</div></div>` + catatanBalas(d.dari), ...aksiBalas(d.dari, d.A));
+}
+// ---- membalas surat: pesanmu dititipkan ke hewan yang membawa suratnya ----
+const BALASAN = (() => { try { return JSON.parse(localStorage.getItem('safari_balasan') || '{}') || {}; } catch (e) { return {}; } })();
+const NAMA_HEWAN = { kelinci: 'kelinci', gajah: 'gajah', jerapah: 'jerapah' };
+const catatanBalas = (dari) => !dari ? '' : BALASAN[dari] ? `<div class="catatan">💌 Balasanmu sudah dititipkan ke ${NAMA_HEWAN[dari]}.</div>` : `<div class="catatan">Ingin membalas pesannya? Tulis pesanmu, nanti dititipkan ke ${NAMA_HEWAN[dari]}.</div>`;
+const aksiBalas = (dari, A) => dari && A && !BALASAN[dari] ? ['✍️ Balas pesannya', () => tulisBalasan(dari, A)] : [];
+function tulisBalasan(dari, A) {
+  kartu('✍️', 'Balas untuk ' + NAMA_HEWAN[dari], `<p style="margin:0 0 6px">Tulis pesan yang ingin kamu titipkan ke ${NAMA_HEWAN[dari]}:</p><textarea id="balas-surat" maxlength="500" rows="5" placeholder="Terima kasih ya…" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border-radius:12px;border:1.5px solid #e2dccd;background:repeating-linear-gradient(#fffaf0 0 27px,#e9dfc9 27px 28px);line-height:28px"></textarea>`, 'Titipkan 💌', () => {
+    const t = ($('balas-surat') && $('balas-surat').value || '').trim();
+    if (!t) { hint('Tulis pesannya dulu ya 💌', 2500); setTimeout(() => tulisBalasan(dari, A), 300); return; }
+    BALASAN[dari] = { teks: t, waktu: Date.now() }; try { localStorage.setItem('safari_balasan', JSON.stringify(BALASAN)); } catch (e) {}
+    mulaiTitip(dari, A);
+  });
+  $('k-tutup').textContent = 'Batal';
+  setTimeout(() => { const i = $('balas-surat'); if (i) { i.focus(); i.onkeydown = e => e.stopPropagation(); i.onkeyup = e => e.stopPropagation(); } }, 50);
+}
+function mulaiTitip(dari, A) {
+  if (AMATI.aktif) selesaiAmati();
+  if (A.kej && A.kej.bunga && A.kej.bunga.parent === A.head) A.head.remove(A.kej.bunga);
+  gelKamu.textContent = 'Aku titipkan suratku juga ya 💌'; gelKamu.classList.remove('sembunyi'); kamuBicaraT = 4;
+  const amplop = buatAmplop(false); amplop.scale.setScalar(0.6); amplop.rotation.x = 1.2; kamu.arms[1].hand.add(amplop);
+  hadapkanKe(A.group.position.x, A.group.position.z); if (mode === 'fpp') camPitch = 0.1;
+  const dekat = dari === 'kelinci' ? kakiDepan(0.7) : clampIn(A.encl, player.x, player.z, dari === 'gajah' ? 1.6 : 1.4);
+  A.state = 'kejutan'; A.kej = { jenis: 'titip', dari, fase: 0, t: 0, amplop, dekat }; KEJ.aktif = A;
+}
+function updateTitip(A, K, dt, ke) {
+  const hadap = () => { const want = Math.atan2(player.x - A.group.position.x, player.z - A.group.position.z); A.yaw += angDiff(A.yaw, want) * Math.min(1, dt * 4); };
+  if (K.fase === 0) { if (ke(K.dekat[0], K.dekat[1], K.dari === 'kelinci' ? 2 : 1.3) || K.t > 12) { K.fase = 1; K.t = 0; } }
+  else if (K.fase === 1) {
+    hadap(); A.graze = K.dari === 'gajah' ? 0 : Math.min(K.dari === 'jerapah' ? 0.75 : 0.6, K.t * 0.6);
+    if (K.dari === 'gajah') A.trunk.forEach(sg => sg.rotation.x = lerp(sg.rotation.x, -0.3, dt * 2));
+    if (K.t > 1.3) { K.amplop.getWorldPosition(tmpA); K.dari0 = tmpA.clone(); scene.attach(K.amplop); K.fase = 2; K.t = 0; }
+  }
+  else if (K.fase === 2) {
+    const u = Math.min(1, K.t / 1), tuju = K.dari === 'gajah' ? A.trunk[A.trunk.length - 1] : A.head;
+    tmpB.set(0, K.dari === 'gajah' ? -0.3 : -0.05, K.dari === 'gajah' ? 0.05 : (K.dari === 'jerapah' ? 0.32 : 0.16)); tuju.localToWorld(tmpB);
+    K.amplop.position.lerpVectors(K.dari0, tmpB, ease(u)); K.amplop.position.y += Math.sin(u * Math.PI) * 0.35;
+    if (u >= 1) {
+      tuju.attach(K.amplop); hearts(tmpB, 4, '💌'); K.fase = 3; K.t = 0;
+      if (K.dari === 'kelinci') { K.amplop.position.set(0, -0.05, 0.16); K.amplop.scale.setScalar(0.55); }
+      bicara({ kelinci: 'Kelincinya menerima suratmu! 🐰', gajah: 'Gajahnya memegang suratmu pakai belalai 🐘', jerapah: 'Jerapahnya menggigit suratmu pelan-pelan 🦒' }[K.dari], 4);
+    }
+  }
+  else if (K.fase === 3) {
+    A.graze = Math.max(0, A.graze - dt); if (K.dari === 'gajah') A.trunk.forEach(sg => sg.rotation.x = lerp(sg.rotation.x, -0.45, dt * 2));
+    if (K.t > 1.2) { K.fase = 4; K.t = 0; K.pergi = K.dari === 'kelinci' ? RUMAH_KELINCI.pintu : clampIn(A.encl, A.group.position.x + Math.sin(A.yaw + Math.PI) * 8, A.group.position.z + Math.cos(A.yaw + Math.PI) * 8, 2); }
+  }
+  else if (K.fase === 4) {
+    if (ke(K.pergi[0], K.pergi[1], K.dari === 'kelinci' ? 2.2 : 1.2) || K.t > 12) {
+      if (K.dari === 'kelinci') { A.sembunyi = true; A.group.visible = false; K.amplop.parent && K.amplop.parent.remove(K.amplop); K.fase = 5; K.t = 0; hint('Kelinci membawa suratmu masuk ke rumahnya 💌', 4000); setTimeout(() => bicara('Suratmu pasti sampai. Aku jadi penasaran isinya 😊', 4), 1200); }
+      else { if (K.dari === 'gajah') A.trunk.forEach((sg, i) => sg.rotation.x = i === 0 ? -0.25 : 0.12); K.amplop.parent && K.amplop.parent.remove(K.amplop); hint(`${NAMA_HEWAN[K.dari][0].toUpperCase() + NAMA_HEWAN[K.dari].slice(1)} membawa suratmu pergi 💌`, 4000); selesaiKejutan(A); }
+    }
+  }
+  else if (K.fase === 5 && K.t > 2.5) {
+    A.sembunyi = false; A.group.visible = true; A.group.position.set(RUMAH_KELINCI.pintu[0], 0, RUMAH_KELINCI.pintu[1] - 0.2); A.yaw = Math.PI;
+    K.fase = 6; K.t = 0; K.pulang = clampIn(A.encl, A.group.position.x, A.group.position.z, 2);
+  }
+  else if (K.fase === 6) { if (ke(K.pulang[0], K.pulang[1], 2) || K.t > 6) selesaiKejutan(A); }
 }
 
 // ---- rumah kelinci & kubangan lumpur gajah ----
@@ -3752,7 +3810,7 @@ function updateKejutanHewan(A, dt, t) {
     else if (K.fase === 3) { const p = kakiDepan(0.6); K.akhir = p; if (ke(p[0], p[1], 1.8)) { K.fase = 4; K.t = 0; } }
     else if (K.fase === 4) {
       A.graze = Math.min(1, K.t * 2);
-      if (K.t > 0.7) { taruhSurat(K.surat, K.akhir[0], K.akhir[1], { judul: KJT(KJ.kelinci, 'judul', 'Surat dari Kelinci 🐰'), isi: KJT(KJ.kelinci, 'isi', 'Hai! Ada yang titip pesan buat kamu: kamu orang paling spesial hari ini 💛'), lumpur: false }); K.fase = 5; K.t = 0; hint('Kelinci menaruh surat di depan kakimu. Ketuk suratnya 💌', 5000); if (mode === 'fpp') camPitch = 0.5; }
+      if (K.t > 0.7) { taruhSurat(K.surat, K.akhir[0], K.akhir[1], { judul: KJT(KJ.kelinci, 'judul', 'Surat dari Kelinci 🐰'), isi: KJT(KJ.kelinci, 'isi', 'Hai! Ada yang titip pesan buat kamu: kamu orang paling spesial hari ini 💛'), lumpur: false, dari: 'kelinci', A }); K.fase = 5; K.t = 0; hint('Kelinci menaruh surat di depan kakimu. Ketuk suratnya 💌', 5000); if (mode === 'fpp') camPitch = 0.5; }
     }
     else if (K.fase === 5) { A.graze = Math.max(0, 1 - K.t * 2); const [bx, bz] = clampIn(A.encl, A.group.position.x, A.group.position.z, 2); if (ke(bx, bz, 2) || K.t > 6) selesaiKejutan(A); }
   } else if (K.jenis === 'gajahSurat') {
@@ -3772,9 +3830,11 @@ function updateKejutanHewan(A, dt, t) {
     else if (K.fase === 4) {
       const u = Math.min(1, K.t / 0.9);
       K.surat.position.set(lerp(K.dari.x, K.akhir[0], u), lerp(K.dari.y, 0.03, u) + Math.sin(u * Math.PI) * 0.6, lerp(K.dari.z, K.akhir[1], u)); K.surat.rotation.x = lerp(1.4, 0, u);
-      if (u >= 1) { taruhSurat(K.surat, K.akhir[0], K.akhir[1], { judul: KJT(KJ.gajah, 'judul', 'Surat dari Gajah 🐘'), isi: KJT(KJ.gajah, 'isi', 'Maaf suratnya kena lumpur sedikit, tadi aku main di kubangan. Isinya tetap sama: kamu disayang banget! 💌'), lumpur: true }); hint('Gajah menaruh surat yang agak berlumpur di depan kakimu. Ketuk suratnya 💌', 5000); if (mode === 'fpp') camPitch = 0.5; K.fase = 5; K.t = 0; }
+      if (u >= 1) { taruhSurat(K.surat, K.akhir[0], K.akhir[1], { judul: KJT(KJ.gajah, 'judul', 'Surat dari Gajah 🐘'), isi: KJT(KJ.gajah, 'isi', 'Maaf suratnya kena lumpur sedikit, tadi aku main di kubangan. Isinya tetap sama: kamu disayang banget! 💌'), lumpur: true, dari: 'gajah', A }); hint('Gajah menaruh surat yang agak berlumpur di depan kakimu. Ketuk suratnya 💌', 5000); if (mode === 'fpp') camPitch = 0.5; K.fase = 5; K.t = 0; }
     }
     else if (K.fase === 5 && K.t > 1.5) selesaiKejutan(A);
+  } else if (K.jenis === 'titip') {
+    updateTitip(A, K, dt, ke);
   } else if (K.jenis === 'semprot') {
     const want = Math.atan2(player.x - A.group.position.x, player.z - A.group.position.z); A.yaw += angDiff(A.yaw, want) * Math.min(1, dt * 3);
     const naik = K.t < 1.2 ? K.t / 1.2 : (K.t > 5 ? Math.max(0, 1 - (K.t - 5)) : 1);
@@ -3798,7 +3858,7 @@ function updateKejutanHewan(A, dt, t) {
       if (u >= 1) {
         kepala.attach(K.bunga); K.bunga.position.set(0.12, 0.12, 0.02); K.bunga.rotation.set(0, 0, -0.9); K.bunga.scale.setScalar(1.1);
         hearts(tmpB, 5, '🌸'); K.fase = 3; K.t = 0;
-        kartu('🌸', 'Bunga dari Jerapah', `<p style="text-align:center;font-size:17px;line-height:1.5">${escH(KJT(KJ, 'jerapah', 'Bunga ini dari jerapah. Katanya, kamu cantik sekali hari ini 🌸')).replace(/\n/g, '<br>')}</p>`);
+        kartu('🌸', 'Bunga dari Jerapah', `<p style="text-align:center;font-size:17px;line-height:1.5">${escH(KJT(KJ, 'jerapah', 'Bunga ini dari jerapah. Katanya, kamu cantik sekali hari ini 🌸')).replace(/\n/g, '<br>')}</p>` + catatanBalas('jerapah'), ...aksiBalas('jerapah', A));
         setTimeout(() => bicara('Bunganya cocok banget di rambutmu.', 4), 400);
       }
     }
@@ -4600,4 +4660,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSemprot(dt); updateS
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
