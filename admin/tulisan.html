@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Tulisan dari Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--hijau:#2f5d3a;--krem:#fffaf0;--teks:#26302a;--garis:#e2dccd;--merah:#b23b3b}
+*{box-sizing:border-box}
+body{margin:0;background:#f1ece0;font-family:Fredoka,system-ui,sans-serif;color:var(--teks)}
+main{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+h1{color:var(--hijau);margin:0 0 4px}
+a{color:var(--hijau)}
+.kartu{background:var(--krem);border-radius:18px;padding:18px;margin:16px 0;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+label{display:block;font-weight:500;margin:12px 0 4px}
+input{width:100%;font:inherit;padding:10px 12px;border:1.5px solid var(--garis);border-radius:12px;background:#fff}
+small,.kecil{opacity:.7;font-size:13px}
+button{font:inherit;border:0;border-radius:999px;padding:10px 18px;cursor:pointer;background:#e6e1d4;color:var(--teks)}
+button.utama{background:var(--hijau);color:#fff}
+button.hapus{background:#f6dede;color:var(--merah);padding:6px 14px;font-size:13px}
+.baris{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.status{margin-top:10px;font-size:14px}.status.gagal{color:var(--merah)}.status.ok{color:var(--hijau)}
+.saring{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 0}
+.saring button{padding:6px 12px;font-size:13px}.saring button.aktif{background:var(--hijau);color:#fff}
+.tulisan{background:#fff;border:1.5px solid var(--garis);border-radius:14px;padding:12px 14px;margin-top:10px}
+.tulisan .atas{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px}
+.tulisan .atas b{color:var(--hijau);font-size:14px}
+.tulisan .atas span{opacity:.65}
+.tulisan .isi{white-space:pre-wrap;word-break:break-word;margin:8px 0;font-size:16px;line-height:1.5;background:repeating-linear-gradient(#fffaf0 0 25px,#ece3cf 25px 26px);padding:4px 10px;border-radius:8px}
+.kosong{text-align:center;opacity:.6;padding:24px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1>📝 Tulisan dari Game</h1>
+  <p class="kecil">Semua yang diketik di game Liburan masuk ke sini: balasan surat untuk kelinci, gajah dan jerapah, permohonan saat tiup lilin, dan balasan ke orang lain di taman. <a href="./">← Kembali ke Admin</a></p>
+
+  <div class="kartu">
+    <label for="sandi">Sandi baca</label>
+    <input id="sandi" type="password" autocomplete="off" placeholder="Sandi baca database">
+    <small>Sama dengan sandi baca di admin game ulang tahun (database yang sama). Diingat di browser ini saja.</small>
+    <div class="baris"><button class="utama" id="muat">Muat tulisan</button><button id="segarkan" hidden>↻ Muat ulang</button></div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="kartu" id="hasil" hidden>
+    <div class="saring" id="saring"></div>
+    <div id="daftar"></div>
+  </div>
+</main>
+<script src="../data.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var D = window.SAFARI || {}, semua = [], saring = 'semua';
+  var KUNCI = 'liburan_db_sandi';
+  try { $('sandi').value = localStorage.getItem(KUNCI) || ''; } catch (e) {}
+  function status(k, t) { var s = $('status'); s.className = 'status' + (k ? ' ' + k : ''); s.textContent = t; }
+  function escH(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function waktu(w) { try { return new Date(w).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return w; } }
+  function panggil(path, body) {
+    var u = String(D.dbUrl || '').replace(/\/+$/, ''), k = String(D.dbKey || '');
+    if (!u || !k) return Promise.reject(new Error('Database belum diatur di data.js (dbUrl dan dbKey).'));
+    var h = { apikey: k, 'Content-Type': 'application/json' }; if (/^eyJ/.test(k)) h.Authorization = 'Bearer ' + k;
+    return fetch(u + '/rest/v1/' + path, { method: 'POST', headers: h, body: JSON.stringify(body) }).then(function (r) {
+      if (r.ok) return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
+      return r.json().catch(function () { return {}; }).then(function (j) { var m = j.message || ('HTTP ' + r.status); if (/Sandi salah/.test(m)) m = 'Sandi baca salah.'; throw new Error(m); });
+    });
+  }
+  function jenis(b) { return /^Balasan surat/.test(b) ? 'surat' : /lilin/.test(b) ? 'lilin' : /^Balasan ke orang/.test(b) ? 'orang' : 'lain'; }
+  var LABEL = { semua: 'Semua', surat: '💌 Balasan surat', lilin: '🎂 Permohonan', orang: '💬 Ke orang lain', lain: 'Lainnya' };
+  function tampil() {
+    var hitung = { semua: semua.length }; semua.forEach(function (r) { var j = jenis(r.bagian); hitung[j] = (hitung[j] || 0) + 1; });
+    $('saring').innerHTML = Object.keys(LABEL).filter(function (k) { return hitung[k]; }).map(function (k) { return '<button data-k="' + k + '" class="' + (k === saring ? 'aktif' : '') + '">' + LABEL[k] + ' (' + hitung[k] + ')</button>'; }).join('');
+    var rows = semua.filter(function (r) { return saring === 'semua' || jenis(r.bagian) === saring; });
+    var w = $('daftar'); w.innerHTML = rows.length ? '' : '<div class="kosong">Belum ada tulisan.</div>';
+    rows.forEach(function (r) {
+      var d = document.createElement('div'); d.className = 'tulisan';
+      d.innerHTML = '<div class="atas"><b>' + escH(r.bagian) + '</b><span>' + escH(waktu(r.waktu)) + (r.nama ? ' · ' + escH(r.nama) : '') + '</span></div><div class="isi">' + escH(r.teks) + '</div><button class="hapus">Hapus</button>';
+      d.querySelector('button').onclick = function () {
+        if (!confirm('Hapus tulisan ini? Tidak bisa dikembalikan.')) return;
+        panggil('rpc/hapus_tulisan', { sandi: $('sandi').value, nomor: r.id }).then(function () { semua = semua.filter(function (x) { return x !== r; }); tampil(); }).catch(function (e) { alert('Gagal menghapus: ' + e.message); });
+      };
+      w.appendChild(d);
+    });
+  }
+  $('saring').onclick = function (e) { var b = e.target.closest('button'); if (b) { saring = b.dataset.k; tampil(); } };
+  function muat() {
+    var s = $('sandi').value; if (!s) { status('gagal', 'Isi sandi baca dulu.'); $('sandi').focus(); return; }
+    status('', 'Memuat…');
+    panggil('rpc/baca_tulisan', { sandi: s }).then(function (baris) {
+      try { localStorage.setItem(KUNCI, s); } catch (e) {}
+      semua = (baris || []).filter(function (r) { return r.tokoh === 'liburan'; });
+      status('ok', semua.length ? semua.length + ' tulisan dari game Liburan.' : 'Belum ada tulisan dari game Liburan.');
+      $('hasil').hidden = false; $('segarkan').hidden = false; tampil();
+    }).catch(function (e) { status('gagal', 'Gagal: ' + e.message); });
+  }
+  $('muat').onclick = muat; $('segarkan').onclick = muat;
+  $('sandi').onkeydown = function (e) { if (e.key === 'Enter') muat(); };
+  if ($('sandi').value) muat();
+})();
+</script>
+</body>
+</html>

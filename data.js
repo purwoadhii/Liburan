@@ -122,5 +122,9 @@ window.SAFARI = {
     foodcourt: 'Banyak banget pilihannya. Kamu mau makan apa?',
     bioskop: 'Nonton film yuk, aku yang pilih tempat duduknya.',
     burung: 'Ayo masuk ke sangkar burung. Pelan-pelan ya, biar burungnya nggak kaget.'
-  }
+  },
+  // database Supabase untuk menyimpan semua yang diketik di game (dibaca di admin/tulisan.html).
+  // Kunci ini kunci publishable (boleh publik): hanya bisa menambah tulisan, membacanya perlu sandi baca.
+  dbUrl: 'https://ecfcpfugabilotcqkwso.supabase.co',
+  dbKey: 'sb_publishable_vTjfumwu9EI3lBLFN0uxvg_dycibxF7'
 };

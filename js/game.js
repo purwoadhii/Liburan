@@ -2241,12 +2241,22 @@ let npcBicara = null, npcBicaraT = 0, tegurJeda = 0, npcKonteks = '', npcTerakhi
 // balas dengan mengetik: tulisanmu muncul di atas kepala si cewek
 const gelKamu = document.createElement('div'); gelKamu.id = 'gelembung-kamu'; gelKamu.className = 'sembunyi'; $('hud').appendChild(gelKamu);
 let kamuBicaraT = 0;
+// simpan semua yang diketik di game ke database (Supabase, diatur di data.js), dibaca di admin/tulisan.html
+function simpanTulisan(bagian, teks) {
+  const u = String(D.dbUrl || '').replace(/\/+$/, ''), k = String(D.dbKey || '');
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(u) || !k || !String(teks || '').trim()) return;
+  const h = { apikey: k, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
+  if (/^eyJ/.test(k)) h.Authorization = 'Bearer ' + k;
+  const U = (window.KEJUTAN || {}).ultah || {};
+  try { fetch(u + '/rest/v1/tulisan', { method: 'POST', keepalive: true, headers: h, body: JSON.stringify({ bagian: String(bagian).slice(0, 80), teks: String(teks).slice(0, 3000), nama: String(U.nama || '').slice(0, 80), tokoh: 'liburan' }) }).catch(() => {}); } catch (e) {}
+}
 function bukaBalas() {
   const N = npcBicara; if (!N) return;
-  const ctx = npcKonteks;
+  const ctx = npcKonteks, kata = gelNpc.textContent;
   kartu('⌨️', 'Balas', '<input id="balas-teks" maxlength="120" placeholder="Ketik balasanmu…" autocomplete="off">', 'Kirim', () => {
     const t = ($('balas-teks') && $('balas-teks').value || '').trim(); if (!t) return;
     gelKamu.textContent = t; gelKamu.classList.remove('sembunyi'); kamuBicaraT = 4.5;
+    simpanTulisan('Balasan ke orang lain' + (kata ? ': "' + kata.slice(0, 50) + '"' : ''), t);
     if (!N.duduk || N.pergi) N.yaw = Math.atan2(-(player.x - N.x), -(player.z - N.z));
     const B = D.balasanNpc || {}; const r = B[ctx] || B._;
     if (r && r.length) setTimeout(() => { npcBicara = N; npcBicaraT = 2.8; gelNpc.textContent = pick(r); gelNpc.classList.remove('sembunyi'); }, 1800);
@@ -3648,7 +3658,7 @@ function tulisBalasan(dari, A) {
   kartu('✍️', 'Balas untuk ' + NAMA_HEWAN[dari], `<p style="margin:0 0 6px">Tulis pesan yang ingin kamu titipkan ke ${NAMA_HEWAN[dari]}:</p><textarea id="balas-surat" maxlength="500" rows="5" placeholder="Terima kasih ya…" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border-radius:12px;border:1.5px solid #e2dccd;background:repeating-linear-gradient(#fffaf0 0 27px,#e9dfc9 27px 28px);line-height:28px"></textarea>`, 'Titipkan 💌', () => {
     const t = ($('balas-surat') && $('balas-surat').value || '').trim();
     if (!t) { hint('Tulis pesannya dulu ya 💌', 2500); setTimeout(() => tulisBalasan(dari, A), 300); return; }
-    BALASAN[dari] = { teks: t, waktu: Date.now() }; try { localStorage.setItem('safari_balasan', JSON.stringify(BALASAN)); } catch (e) {}
+    BALASAN[dari] = { teks: t, waktu: Date.now() }; simpanTulisan('Balasan surat ' + NAMA_HEWAN[dari], t); try { localStorage.setItem('safari_balasan', JSON.stringify(BALASAN)); } catch (e) {}
     mulaiTitip(dari, A);
   });
   $('k-tutup').textContent = 'Batal';
@@ -3998,7 +4008,7 @@ function tanyaTiup() {
     kartu('🎂', 'Selamat Ulang Tahun' + (nama ? ', ' + nama : '') + '!', `<p style="text-align:center;font-size:17px;line-height:1.5">${escH(KJT(U, 'ucapan', 'Semoga semua harapanmu terkabul. Terima kasih sudah jadi orang paling spesial 💖')).replace(/\n/g, '<br>')}</p><label style="display:block;font-weight:600;margin-top:10px">🙏 Tulis permohonanmu dulu</label><textarea id="wish" maxlength="300" rows="3" placeholder="Aku berharap…" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border-radius:12px;border:1.5px solid #e2dccd;margin-top:6px"></textarea><div class="catatan">Setelah menulis permohonan, tiup lilinnya.</div>`, 'Tiup lilin 🕯️', () => {
       const w = ($('wish').value || '').trim();
       if (!w) { res(); hint('Tulis permohonannya dulu ya, baru tiup lilin 🙏', 3000); setTimeout(tanyaTiup, 400); return; }
-      KUE.wish = w; try { localStorage.setItem('safari_wish', JSON.stringify({ wish: w, waktu: Date.now() })); } catch (e) {}
+      KUE.wish = w; simpanTulisan('Permohonan saat tiup lilin', w); try { localStorage.setItem('safari_wish', JSON.stringify({ wish: w, waktu: Date.now() })); } catch (e) {}
       tiupLilin(); res();
     });
     setTimeout(() => { const i = $('wish'); if (i) { i.focus(); i.onkeydown = e => e.stopPropagation(); i.onkeyup = e => e.stopPropagation(); } }, 50);
