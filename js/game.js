@@ -1884,7 +1884,7 @@ function posisiDuduk() {
   player.x = duduk.a[0]; player.z = duduk.a[1]; partner.x = duduk.b[0]; partner.z = duduk.b[1];
   player.yaw = duduk.yaw; player.speed = 0; partner.speed = 0;
   const hh = duduk.h || 0;
-  kamu.group.position.set(player.x, 0.52 - kamu.hip + hh, player.z); dia.group.position.set(partner.x, 0.52 - dia.hip + hh, partner.z);
+  kamu.group.position.set(player.x, 0.52 - kamu.hip + hh, player.z); dia.group.position.set(partner.x, 0.52 - dia.hip + (duduk.hb != null ? duduk.hb : hh), partner.z);
   kamu.group.rotation.y = dia.group.rotation.y = duduk.yaw + Math.PI;
   for (const P of [kamu, dia]) for (const l of P.legs) l.rotation.x = -1.45;
   if (duduk.anim) animNaikTurun(hh);
@@ -1939,7 +1939,7 @@ function bukaFilm() {
   kartu('🎬', 'Loket Bioskop', html, 'Bayar', () => {
     const r = hitung();
     if (r.saja && !r.pop && !r.min) { hint('Pilih popcorn atau minuman dulu.'); return; }
-    if (!r.saja && !BIOS.pilih) { hint('Pilih kursi dulu di denah ya 🎟️', 3000); setTimeout(bukaFilm, 300); return; }
+    if (!r.saja && !(BIOS.pilih && BIOS.pilih.length === 2)) { hint(BIOS.pilih ? 'Pilih juga kursi untuk pasanganmu ya 🎟️' : 'Pilih kursi dulu di denah ya 🎟️', 3000); setTimeout(bukaFilm, 300); return; }
     if (!bayar(r.tot)) { hint(`Uangnya nggak cukup. Totalnya ${fmtRp(r.tot)}, sisa uang ${fmtRp(DOMPET.sisa)}.`, 3800); return; }
     if (r.pop || r.min) { aturBawa(r.pop, r.min); setTimeout(() => bicara(BAWA.cewek.length ? 'Kamu bawa satu, aku bawa satu ya.' : 'Biar aku yang bawa popcorn sama minumnya.', 3.5), 400); }
     if (!r.saja) { const c = document.querySelector('#k-isi input[name=cara]:checked'); BIOS.cara = c ? c.value : '3d'; const x = document.querySelector('#k-isi input[name=film]:checked'); mulaiFilm(daftar[x ? +x.value : 0], BIOS.pilih); }
@@ -1970,37 +1970,43 @@ function denahKursi() {
     });
     h += '</div>';
   }
-  h += '<div style="display:flex;gap:12px;justify-content:center;font-size:11px;margin-top:8px;opacity:.85"><span>🟥 kosong</span><span>⬛ terisi</span><span>🟩 kursi kalian</span></div></div><div class="catatan" id="kursi-kita">Ketuk satu kursi, kursi sebelahnya ikut dipilih untuk pasanganmu.</div>';
+  h += '<div style="display:flex;gap:12px;justify-content:center;font-size:11px;margin-top:8px;opacity:.85"><span>🟥 kosong</span><span>⬛ terisi</span><span style="color:#f39bbd">■ kamu</span><span style="color:#7fb2e6">■ dia</span></div></div><div class="catatan" id="kursi-kita">Ketuk kursi untukmu dulu, lalu kursi untuk pasanganmu. Boleh terpisah kalau bioskopnya penuh.</div>';
   return h;
 }
+// pilih kursi satu per satu: ketukan pertama kursi kamu, kedua kursi dia (boleh terpisah)
 function pilihKursi(i) {
   const k = BIOS.kursi[i]; if (!k || BIOS.rencana.has(i)) return;
-  const urut = ['A', 'B', 'C', 'D', 'E', 'F'], c = urut.indexOf(k.kol), blok = c < 3 ? 0 : 3;
-  const cari = (kol) => BIOS.kursi.findIndex(x => x.kol === kol && x.no === k.no);
-  const kanan = c - blok < 2 ? cari(urut[c + 1]) : -1, kiri = c - blok > 0 ? cari(urut[c - 1]) : -1;
-  const j = kanan >= 0 && !BIOS.rencana.has(kanan) ? kanan : (kiri >= 0 && !BIOS.rencana.has(kiri) ? kiri : -1);
-  if (j < 0) { hint('Kursi sebelahnya sudah terisi. Pilih kursi lain supaya bisa duduk berdua.', 3500); return; }
-  BIOS.pilih = [k, BIOS.kursi[j]];
+  let p = BIOS.pilih ? BIOS.pilih.filter(Boolean) : [];
+  if (p.includes(k)) p = p.filter(x => x !== k);
+  else if (p.length < 2) p.push(k);
+  else p[1] = k;
+  BIOS.pilih = p.length ? p : null;
   document.querySelectorAll('#k-isi .kursi-btn').forEach(b => { if (!b.disabled) b.style.background = '#a3262f'; });
-  for (const x of [i, j]) { const b = document.querySelector(`#k-isi .kursi-btn[data-i="${x}"]`); if (b) b.style.background = '#3c9a4a'; }
-  const [a, b] = BIOS.pilih[0].x < BIOS.pilih[1].x ? BIOS.pilih : [BIOS.pilih[1], BIOS.pilih[0]];
-  $('kursi-kita').innerHTML = `Kursi kalian: <b>${a.label} & ${b.label}</b>`;
+  p.forEach((x, n) => { const b = document.querySelector(`#k-isi .kursi-btn[data-i="${BIOS.kursi.indexOf(x)}"]`); if (b) b.style.background = n ? '#3b82c4' : '#e86a9a'; });
+  $('kursi-kita').innerHTML = !p.length ? 'Ketuk kursi untukmu dulu, lalu kursi untuk pasanganmu.'
+    : p.length === 1 ? `Kursi kamu: <b>${p[0].label}</b>. Sekarang ketuk kursi untuk pasanganmu.`
+    : `Kursi kamu: <b>${p[0].label}</b> · kursi dia: <b>${p[1].label}</b>` + (kursiSebelah(p[0], p[1]) ? ' (duduk bersebelahan)' : ' <br>⚠️ Kalian duduk terpisah.');
+}
+function kursiSebelah(a, b) { return a.no === b.no && Math.abs(a.x - b.x) < 1.3; }
+function jalurKursi(k, dariLuar) {
+  const lz = +(k.z - 0.66).toFixed(2), j = [[67.3, 81.5], [67.3, 77.6], [68.6, lz], [k.x, lz], [k.x, k.z - 0.25]];
+  if (!dariLuar) j.shift();
+  return { jalur: j, h: (x, z) => (x > 70.7 && Math.abs(z - lz) < 0.8 ? k.h : 0) };
 }
 let AUTO = null;
 function jalanKeKursi(kG, kB) {
-  const lz = +(kG.z - 0.66).toFixed(2);
-  const [ki, ka] = kB.x < kG.x ? [kB, kG] : [kG, kB];
+  // masing-masing berjalan ke kursinya sendiri (bisa terpisah)
+  const luar = player.z >= 79, A = jalurKursi(kG, luar), B = jalurKursi(kB, luar), sebelah = kursiSebelah(kG, kB);
   AUTO = {
-    jalur: [[67.3, 81.5], [67.3, 77.6], [68.6, lz], [kG.x, lz], [kG.x, kG.z - 0.25]],
-    h: (x, z) => (x > 70.7 && Math.abs(z - lz) < 0.8 ? kG.h : 0),
+    jalur: A.jalur, h: A.h,
+    dia: { jalur: B.jalur, h: B.h, tunda: 0.7, yaw: player.yaw },
     selesai: () => {
-      duduk = { bioskop: true, a: [kG.x, kG.z], b: [kB.x, kB.z], h: kG.h, yaw: 0, sejak: 0 };
+      duduk = { bioskop: true, a: [kG.x, kG.z], b: [kB.x, kB.z], h: kG.h, hb: kB.h, yaw: 0, sejak: 0 };
       camYaw = 0; camPitch = mode === 'tpp' ? 0.12 : -0.12; tampilBerdiri(true);
-      hint(`Duduk di ${ki.label} & ${ka.label}. Film dimulai sebentar lagi 🍿`, 3500);
-      setTimeout(() => bicara(pick(['Pas, kursinya enak.', 'Aku suka nonton bareng kamu.', 'Filmnya kayaknya seru.'])), 800);
+      hint(`Kamu di ${kG.label}, dia di ${kB.label}. Film dimulai sebentar lagi 🍿`, 3500);
+      setTimeout(() => bicara(sebelah ? pick(['Pas, kursinya enak.', 'Aku suka nonton bareng kamu.', 'Filmnya kayaknya seru.']) : pick(['Kita duduk pisah dulu ya, nanti ketemu lagi habis film.', 'Kursinya penuh, nggak apa-apa ya duduknya jauhan sebentar.'])), 800);
     }
   };
-  if (player.z < 79) AUTO.jalur.shift();
 }
 function siapkanVideo(src) {
   const v = document.createElement('video');
@@ -2021,13 +2027,13 @@ function mulaiFilm(f, pilih) {
   BIOS.layarMat.map = textTex([f.judul, 'Segera dimulai…'], { w: 1024, h: 440, size: 72, size2: 48, bg: '#1d1d26', border: '#1d1d26' }); BIOS.layarMat.needsUpdate = true;
   // kursi sesuai tiket: berjalan dulu mencari kursinya, cewek masuk duluan ke kursi yang lebih dalam
   if (!pilih) { const z = BIOS.rows[5]; pilih = [BIOS.kursi.find(k => k.z === z && k.kol === 'B'), BIOS.kursi.find(k => k.z === z && k.kol === 'C')]; }
-  const [kl, kr] = pilih[0].x < pilih[1].x ? pilih : [pilih[1], pilih[0]];
+  const [kG, kB] = pilih;
   const rencana = BIOS.rencana || new Set();
-  BIOS.kursi.forEach((k, i) => k.terisi = rencana.has(i) && k !== kl && k !== kr); kl.terisi = kr.terisi = true;
-  BIOS.kursiKita = [kr, kl];
-  jalanKeKursi(kr, kl);
-  hint(`Cari kursi ${kl.label} & ${kr.label} ya… 🎟️`, 4000);
-  setTimeout(() => bicara(pick(['Kursi kita yang mana ya? Oh, itu dia.', 'Ayo, kursinya baris ' + kl.no + '.', 'Pelan-pelan, gelap.'])), 1500);
+  BIOS.kursi.forEach((k, i) => k.terisi = rencana.has(i) && k !== kG && k !== kB); kG.terisi = kB.terisi = true;
+  BIOS.kursiKita = [kG, kB];
+  jalanKeKursi(kG, kB);
+  hint(`Cari kursi ${kG.label} (kamu) & ${kB.label} (dia) ya… 🎟️`, 4000);
+  setTimeout(() => bicara(pick(['Kursi kita yang mana ya? Oh, itu dia.', 'Ayo, cari kursinya.', 'Pelan-pelan, gelap.'])), 1500);
   // penonton lain
   const kosong = BIOS.kursi.filter(k => !k.terisi && rencana.has(BIOS.kursi.indexOf(k))).concat(BIOS.kursi.filter(k => !k.terisi && !rencana.has(BIOS.kursi.indexOf(k))).sort(() => Math.random() - 0.5));
   const jumlah = Math.min(kosong.length, F.penonton != null ? F.penonton : 24);
@@ -2094,13 +2100,15 @@ function mulaiPutarFilm(penuh) {
 // film selesai / berhenti nonton: penonton keluar sendiri, kalian berjalan keluar dari kursi ke pintu bioskop
 function keluarBioskop() {
   if (!(duduk && duduk.bioskop)) { selesaiFilm(); return; }
-  const kx = duduk.a[0], kz = duduk.a[1], kh = duduk.h || 0, lz = +(kz - 0.66).toFixed(2);
+  const [kG, kB] = BIOS.kursiKita || [{ x: duduk.a[0], z: duduk.a[1], h: duduk.h || 0 }, { x: duduk.b[0], z: duduk.b[1], h: duduk.hb != null ? duduk.hb : (duduk.h || 0) }];
+  const keluar = (k, ujung) => { const J = jalurKursi(k, true); return { jalur: J.jalur.slice(1).reverse().slice(1).concat([[67.3, 81.5], ujung]), h: J.h }; };
   const selesai = BIOS.status === 'putar';
   selesaiFilm(); duduk = null; tampilBerdiri(false);
   hint(selesai ? 'Filmnya selesai. Yuk keluar 🎬' : 'Kalian keluar dari bioskop.', 3000);
+  const A = keluar(kG, [67.3, 88.5]), B = keluar(kB, [68.0, 88.5]);
   AUTO = {
-    jalur: [[kx, lz], [68.6, lz], [67.3, 77.6], [67.3, 81.5], [67.3, 88.5]],
-    h: (x, z) => (x > 70.7 && Math.abs(z - lz) < 0.8 ? kh : 0),
+    jalur: A.jalur, h: A.h,
+    dia: { jalur: B.jalur, h: B.h, tunda: 0.5, yaw: player.yaw },
     selesai: () => {
       kamu.group.position.y = 0; dia.group.position.y = 0;
       if (BAWA.cowok.length || BAWA.cewek.length) { aturBawa(0, 0); setTimeout(() => bicara('Popcorn-nya habis. Gandengan lagi ya.', 3), 600); }
@@ -3354,10 +3362,22 @@ function update(dt, t) {
   }
   let spdAuto = 0;
   if (AUTO && !paused) {
-    const [tx, tz] = AUTO.jalur[0], dx = tx - player.x, dz = tz - player.z, d = Math.hypot(dx, dz);
-    if (d < 0.08) { AUTO.jalur.shift(); if (!AUTO.jalur.length) { const f = AUTO.selesai; AUTO = null; if (f) f(); } }
-    else { const st = Math.min(d, 1.5 * dt); player.x += dx / d * st; player.z += dz / d * st; spdAuto = 1.5; if (d > 0.3) camYaw += angDiff(camYaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 6); }
-    if (AUTO) { kamu.group.position.y = lerp(kamu.group.position.y, AUTO.h(player.x, player.z), Math.min(1, dt * 8)); dia.group.position.y = lerp(dia.group.position.y, AUTO.h(partner.x, partner.z), Math.min(1, dt * 8)); }
+    if (AUTO.jalur.length) {
+      const [tx, tz] = AUTO.jalur[0], dx = tx - player.x, dz = tz - player.z, d = Math.hypot(dx, dz);
+      if (d < 0.08) AUTO.jalur.shift();
+      else { const st = Math.min(d, 1.5 * dt); player.x += dx / d * st; player.z += dz / d * st; spdAuto = 1.5; if (d > 0.3) camYaw += angDiff(camYaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 6); }
+    }
+    const AD = AUTO.dia;
+    if (AD && AD.jalur.length) {
+      if (AD.tunda > 0) AD.tunda -= dt;
+      else {
+        const [tx, tz] = AD.jalur[0], dx = tx - partner.x, dz = tz - partner.z, d = Math.hypot(dx, dz);
+        if (d < 0.08) AD.jalur.shift();
+        else { const st = Math.min(d, 1.5 * dt); partner.x += dx / d * st; partner.z += dz / d * st; if (d > 0.2) AD.yaw += angDiff(AD.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8); }
+      }
+    }
+    if (!AUTO.jalur.length && !(AD && AD.jalur.length)) { const f = AUTO.selesai; AUTO = null; if (f) f(); }
+    if (AUTO) { kamu.group.position.y = lerp(kamu.group.position.y, AUTO.h(player.x, player.z), Math.min(1, dt * 8)); dia.group.position.y = lerp(dia.group.position.y, (AD ? AD.h : AUTO.h)(partner.x, partner.z), Math.min(1, dt * 8)); }
   }
   cekGerbang(zSebelum); cekAirTerjun(zSebelum);
   const spdAntri = antriPemain ? gerakAntri(dt) : 0;
@@ -3381,13 +3401,15 @@ function update(dt, t) {
   const fX = -Math.sin(player.yaw), fZ = -Math.cos(player.yaw), rX = Math.cos(player.yaw), rZ = -Math.sin(player.yaw);
   const tx = player.x + fX * pf + rX * pr, tz = player.z + fZ * pf + rZ * pr;
   const ox = partner.x, oz = partner.z;
-  const k = Math.min(1, dt * 12);
-  partner.x = lerp(partner.x, tx, k); partner.z = lerp(partner.z, tz, k);
-  const pp = { x: partner.x, z: partner.z }; resolve(pp, 0.3); partner.x = pp.x; partner.z = pp.z;
+  const k = Math.min(1, dt * 12), sendiri = !!(AUTO && AUTO.dia);
+  if (!sendiri) {
+    partner.x = lerp(partner.x, tx, k); partner.z = lerp(partner.z, tz, k);
+    const pp = { x: partner.x, z: partner.z }; resolve(pp, 0.3); partner.x = pp.x; partner.z = pp.z;
+  }
   partner.speed = lerp(partner.speed, Math.hypot(partner.x - ox, partner.z - oz) / Math.max(dt, 1e-3), Math.min(1, dt * 6));
   partner.phase += partner.speed * dt * 2.3;
   dia.group.position.set(partner.x, dia.group.position.y, partner.z);
-  dia.group.rotation.y = player.yaw + Math.PI;
+  dia.group.rotation.y = (sendiri ? AUTO.dia.yaw : player.yaw) + Math.PI;
   animPerson(dia, partner.phase, Math.min(1, partner.speed / 3));
 
   updateJip(dt);
@@ -3411,6 +3433,10 @@ function update(dt, t) {
     const d = tmpB.sub(tmpA); const L = d.length(); d.normalize().multiplyScalar(Math.min(L, kamu.arms[1].len * 1.3)); d.y = Math.max(d.y, -0.15);
     aimArm(kamu, kamu.arms[1], tmpA.add(d));
     swingArm(dia.arms[0], 0, -1);
+  } else if (AUTO && AUTO.dia) {
+    // berjalan sendiri-sendiri ke kursi: tidak bergandengan
+    const a = Math.sin(player.phase) * 0.5 * Math.min(1, player.speed / 3), b = Math.sin(partner.phase) * 0.5 * Math.min(1, partner.speed / 3);
+    swingArm(kamu.arms[0], a, 1); swingArm(kamu.arms[1], -a, -1); swingArm(dia.arms[0], b, 1); swingArm(dia.arms[1], -b, -1);
   } else {
     aimArm(kamu, kamu.arms[0], hand); aimArm(dia, dia.arms[1], hand);
     swingArm(kamu.arms[1], -Math.sin(player.phase) * 0.5 * Math.min(1, player.speed / 3), 1);
