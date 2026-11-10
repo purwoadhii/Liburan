@@ -1920,10 +1920,17 @@ function animNaikTurun(hh) {
 
 /* ---------- film ---------- */
 function ytId(u) { const m = String(u || '').match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : null; }
+// film yang penuh: diacak tiap 2 jam taman (sama untuk semua pemain karena ikut jam global)
+function filmPenuh(daftar) {
+  const slot = Math.floor(jamAbs() / 2), acak = (n) => { const x = Math.sin(slot * 12.9898 + n * 78.233) * 43758.5453; return x - Math.floor(x); };
+  const nilai = daftar.map((f, i) => acak(i + 1)), penuh = nilai.map(v => v < 0.35);
+  if (penuh.length && penuh.every(Boolean)) penuh[nilai.indexOf(Math.max(...nilai))] = false;
+  return penuh;
+}
 function bukaFilm() {
-  const daftar = (F.daftar || []).filter(f => f && f.judul).slice(0, 3);
+  const daftar = (F.daftar || []).filter(f => f && f.judul).slice(0, 3), penuh = filmPenuh(daftar), pertama = penuh.indexOf(false);
   const hT = D.tiketBioskop != null ? D.tiketBioskop : 20000, hP = D.hargaPopcorn != null ? D.hargaPopcorn : 25000, hM = D.hargaMinumBioskop != null ? D.hargaMinumBioskop : 15000;
-  const film = daftar.length ? '<div class="menu">' + daftar.map((f, i) => `<label class="menu-item film"><input type="radio" name="film" value="${i}" ${i === 0 ? 'checked' : ''}>${f.poster ? `<img src="${f.poster}" alt="">` : '<span class="poster-kosong">🎬</span>'}<span><b>${f.judul}</b><small>${f.sinopsis || ''}</small></span></label>`).join('') + '</div>' : '<p>Belum ada film yang diputar. Film bisa ditambahkan lewat halaman admin.</p>';
+  const film = daftar.length ? '<div class="menu">' + daftar.map((f, i) => `<label class="menu-item film" style="${penuh[i] ? 'opacity:.55' : ''}"><input type="radio" name="film" value="${i}" ${i === pertama ? 'checked' : ''} ${penuh[i] ? 'disabled' : ''}>${f.poster ? `<img src="${f.poster}" alt="">` : '<span class="poster-kosong">🎬</span>'}<span><b>${f.judul}${penuh[i] ? ' <span style="background:#b8323b;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px">FULL</span>' : ''}</b><small>${penuh[i] ? 'Semua kursi sudah terjual. Coba lagi 2 jam lagi.' : (f.sinopsis || '')}</small></span></label>`).join('') + '</div>' : '<p>Belum ada film yang diputar. Film bisa ditambahkan lewat halaman admin.</p>';
   const baris = (id, nama, h) => `<div class="menu-item" data-id="${id}" data-h="${h}"><span>${nama}<small>${fmtRp(h)}</small></span><button class="qty" data-d="-1">−</button><b class="jml">0</b><button class="qty" data-d="1">+</button></div>`;
   const html = film + `<div class="catatan">🎟️ Tiket ${fmtRp(hT)} per orang</div>` +
     '<p class="label">Popcorn & minuman</p><div class="menu">' + baris('pop', '🍿 Popcorn', hP) + baris('min', '🥤 Minuman', hM) + '</div>' +
@@ -1942,7 +1949,7 @@ function bukaFilm() {
     if (!r.saja && !(BIOS.pilih && BIOS.pilih.length === 2)) { hint(BIOS.pilih ? 'Pilih juga kursi untuk pasanganmu ya 🎟️' : 'Pilih kursi dulu di denah ya 🎟️', 3000); setTimeout(bukaFilm, 300); return; }
     if (!bayar(r.tot)) { hint(`Uangnya nggak cukup. Totalnya ${fmtRp(r.tot)}, sisa uang ${fmtRp(DOMPET.sisa)}.`, 3800); return; }
     if (r.pop || r.min) { aturBawa(r.pop, r.min); setTimeout(() => bicara(BAWA.cewek.length ? 'Kamu bawa satu, aku bawa satu ya.' : 'Biar aku yang bawa popcorn sama minumnya.', 3.5), 400); }
-    if (!r.saja) { const c = document.querySelector('#k-isi input[name=cara]:checked'); BIOS.cara = c ? c.value : '3d'; const x = document.querySelector('#k-isi input[name=film]:checked'); mulaiFilm(daftar[x ? +x.value : 0], BIOS.pilih); }
+    if (!r.saja) { const c = document.querySelector('#k-isi input[name=cara]:checked'); BIOS.cara = c ? c.value : '3d'; const x = document.querySelector('#k-isi input[name=film]:checked'); mulaiFilm(daftar[x ? +x.value : pertama], BIOS.pilih); }
   });
   const segar = () => { const r = hitung(); $('total').textContent = fmtRp(r.tot) + (r.tot > DOMPET.sisa ? ' (uang kurang)' : ''); $('k-aksi').textContent = r.saja ? 'Beli' : 'Bayar & nonton 🍿'; };
   $('k-isi').onclick = (e) => {
@@ -1966,11 +1973,11 @@ function denahKursi() {
     ['A', 'B', 'C', '|', 'D', 'E', 'F'].forEach(kol => {
       if (kol === '|') { h += '<span style="width:16px"></span>'; return; }
       const i = BIOS.kursi.findIndex(k => k.kol === kol && k.no === no), isi = BIOS.rencana.has(i);
-      h += `<button class="kursi-btn" data-i="${i}" ${isi ? 'disabled' : ''} style="width:34px;height:24px;border:0;border-radius:6px 6px 3px 3px;font-size:10px;padding:0;font-family:inherit;${isi ? 'background:#5c5560;color:#8d8590' : 'background:#a3262f;color:#fff'}">${kol}${no}</button>`;
+      h += `<button class="kursi-btn" data-i="${i}" ${isi ? 'disabled' : ''} style="width:34px;height:24px;border:0;border-radius:6px 6px 3px 3px;font-size:10px;padding:0;font-family:inherit;${isi ? 'background:#b8323b;color:#f3c4c7' : 'background:#9a949c;color:#fff'}">${kol}${no}</button>`;
     });
     h += '</div>';
   }
-  h += '<div style="display:flex;gap:12px;justify-content:center;font-size:11px;margin-top:8px;opacity:.85"><span>🟥 kosong</span><span>⬛ terisi</span><span style="color:#f39bbd">■ kamu</span><span style="color:#7fb2e6">■ dia</span></div></div><div class="catatan" id="kursi-kita">Ketuk kursi untukmu dulu, lalu kursi untuk pasanganmu. Boleh terpisah kalau bioskopnya penuh.</div>';
+  h += '<div style="display:flex;gap:12px;justify-content:center;font-size:11px;margin-top:8px;opacity:.85"><span style="color:#c9c4cc">■ kosong</span><span style="color:#e0636b">■ terisi</span><span style="color:#6fd07e">■ dipilih</span></div></div><div class="catatan" id="kursi-kita">Pilihan pertama untuk kamu, pilihan kedua untuk pasanganmu.</div>';
   return h;
 }
 // pilih kursi satu per satu: ketukan pertama kursi kamu, kedua kursi dia (boleh terpisah)
@@ -1981,11 +1988,11 @@ function pilihKursi(i) {
   else if (p.length < 2) p.push(k);
   else p[1] = k;
   BIOS.pilih = p.length ? p : null;
-  document.querySelectorAll('#k-isi .kursi-btn').forEach(b => { if (!b.disabled) b.style.background = '#a3262f'; });
-  p.forEach((x, n) => { const b = document.querySelector(`#k-isi .kursi-btn[data-i="${BIOS.kursi.indexOf(x)}"]`); if (b) b.style.background = n ? '#3b82c4' : '#e86a9a'; });
+  document.querySelectorAll('#k-isi .kursi-btn').forEach(b => { if (!b.disabled) b.style.background = '#9a949c'; });
+  p.forEach((x) => { const b = document.querySelector(`#k-isi .kursi-btn[data-i="${BIOS.kursi.indexOf(x)}"]`); if (b) b.style.background = '#3c9a4a'; });
   $('kursi-kita').innerHTML = !p.length ? 'Ketuk kursi untukmu dulu, lalu kursi untuk pasanganmu.'
     : p.length === 1 ? `Kursi kamu: <b>${p[0].label}</b>. Sekarang ketuk kursi untuk pasanganmu.`
-    : `Kursi kamu: <b>${p[0].label}</b> · kursi dia: <b>${p[1].label}</b>` + (kursiSebelah(p[0], p[1]) ? ' (duduk bersebelahan)' : ' <br>⚠️ Kalian duduk terpisah.');
+    : `Kursi kamu: <b>${p[0].label}</b> · kursi dia: <b>${p[1].label}</b>`;
 }
 function kursiSebelah(a, b) { return a.no === b.no && Math.abs(a.x - b.x) < 1.3; }
 function jalurKursi(k, dariLuar) {
@@ -2016,7 +2023,7 @@ function siapkanVideo(src) {
 function mulaiFilm(f, pilih) {
   if (BIOS.video) selesaiFilm(true);
   const yt = ytId(f.youtube || f.video);
-  BIOS.film = f; BIOS.status = 'masuk'; BIOS.timer = 18;
+  BIOS.film = f; BIOS.status = 'masuk'; BIOS.timer = 18; BIOS.jamMasuk = jamAbs();
   if (!yt && f.video) {
     const v = siapkanVideo(f.video); BIOS.video = v;
     v.play().then(() => v.pause()).catch(() => {});
@@ -2103,6 +2110,9 @@ function keluarBioskop() {
   const [kG, kB] = BIOS.kursiKita || [{ x: duduk.a[0], z: duduk.a[1], h: duduk.h || 0 }, { x: duduk.b[0], z: duduk.b[1], h: duduk.hb != null ? duduk.hb : (duduk.h || 0) }];
   const keluar = (k, ujung) => { const J = jalurKursi(k, true); return { jalur: J.jalur.slice(1).reverse().slice(1).concat([[67.3, 81.5], ujung]), h: J.h }; };
   const selesai = BIOS.status === 'putar';
+  // satu film = 2 jam taman: setelah keluar, jam sudah lewat 2 jam dari saat masuk
+  if (selesai && BIOS.jamMasuk != null && jamAbs() < BIOS.jamMasuk + 2) { WAKTU.geser += BIOS.jamMasuk + 2 - jamAbs(); setTimeout(() => hint('Sudah jam ' + jamTeks(WAKTU.jam) + '. Dua jam berlalu selama nonton 🎬', 3500), 3200); }
+  BIOS.jamMasuk = null;
   selesaiFilm(); duduk = null; tampilBerdiri(false);
   hint(selesai ? 'Filmnya selesai. Yuk keluar 🎬' : 'Kalian keluar dari bioskop.', 3000);
   const A = keluar(kG, [67.3, 88.5]), B = keluar(kB, [68.0, 88.5]);
