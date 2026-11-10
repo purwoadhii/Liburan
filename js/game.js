@@ -1284,7 +1284,7 @@ const ANTRIAN = [];
 const FC_PINTU = [50, 79.2];
 let antriPemain = null;
 function buatAntrian(pos, dir, jenis, data, target) {
-  const q = { pos, dir, jenis, data, list: [], layan: 0, target, dasar: target, waktuLayan: rand(3.5, 6) };
+  const q = { pos, dir, jenis, data, list: [], datang: [], layan: 0, target, dasar: target, waktuLayan: rand(3.5, 6) };
   ANTRIAN.push(q); return q;
 }
 const slotAntri = (q, n) => [q.pos[0] + q.dir[0] * n * 0.95, q.pos[1] + q.dir[1] * n * 0.95];
@@ -1304,7 +1304,8 @@ function spawnAntri(q) {
   else if (q.jenis === 'masuk') { const x = rand(8, 52); N = buatNpc([x, 120]); N.x = x; N.z = 120; }
   else { N = npcGedung(buatNpc([rand(52, 84), 88.6]), 'bios'); }
   N.speed = rand(1.2, 1.6);
-  tambahKeAntrian(q, N);
+  // baru dianggap antre setelah sampai di ujung antrean (tidak "booking" tempat dari jauh)
+  N.menujuAntri = q; q.datang.push(N);
 }
 function selesaiLayan(q, N) {
   q.list.shift(); N.antri = null; q.layan = 0; q.waktuLayan = rand(3.5, 6.5);
@@ -1324,8 +1325,15 @@ function selesaiLayan(q, N) {
 function updateAntrian(dt) {
   for (const q of ANTRIAN) {
     if (Math.hypot(q.pos[0] - player.x, q.pos[1] - player.z) > 45) continue;
-    const npcN = q.list.filter(m => m !== 'pemain').length;
+    const npcN = q.list.filter(m => m !== 'pemain').length + q.datang.length;
     if (npcN < q.target && Math.random() < dt * 0.25) spawnAntri(q);
+    // yang sedang berjalan ke antrean: menuju ujung antrean saat ini, masuk antrean begitu sampai
+    for (let i = q.datang.length - 1; i >= 0; i--) {
+      const N = q.datang[i], [tx, tz] = slotAntri(q, q.list.length);
+      if (Math.hypot(tx - N.x, tz - N.z) < 0.6) { q.datang.splice(i, 1); N.menujuAntri = null; tambahKeAntrian(q, N); continue; }
+      const akhir = N.jalur[N.jalur.length - 1];
+      if (!akhir || Math.hypot(akhir[0] - tx, akhir[1] - tz) > 0.1) N.jalur = [[tx, tz]];
+    }
     if (npcN > q.target + 1 && q.list.length && q.list[q.list.length - 1] !== 'pemain' && Math.random() < dt * 0.05) { const N = q.list.pop(); N.antri = null; N.jalur = q.jenis === 'kios' ? [FC_PINTU, [rand(40, 85), 88]] : q.jenis === 'masuk' ? [[rand(8, 52), 120]] : [[rand(52, 84), 89]]; N.pergi = true; }
     q.list.forEach((m, idx) => {
       if (m === 'pemain') return;
@@ -1357,7 +1365,7 @@ function tawarAntri(q, langsung, judul) {
 function masukAntrian(q) {
   const di = q.list.filter(m => m !== 'pemain').length;
   if (!di) return false;
-  q.list.push('pemain'); antriPemain = { q, dilayani: false };
+  antriPemain = { q, dilayani: false, datang: true };   // masuk antrean setelah sampai di ujungnya
   hint(`Antre dulu ya, ada ${di} orang di depan kalian.`, 3200);
   setTimeout(() => bicara(pick(['Nggak apa-apa antre, yang penting sama kamu.', 'Ramai banget ya. Kita antre bareng.', 'Sabar ya, sebentar lagi giliran kita.'])), 1400);
   $('btn-antri').classList.remove('sembunyi');
@@ -1368,11 +1376,18 @@ function keluarAntrian() {
   if (!antriPemain) return;
   const q = antriPemain.q, i = q.list.indexOf('pemain');
   if (i >= 0) q.list.splice(i, 1);
+  if (i < 0) { antriPemain = null; $('btn-antri').classList.add('sembunyi'); return; }
   if (i === 0) q.layan = 0;
   antriPemain = null; $('btn-antri').classList.add('sembunyi');
 }
 function gerakAntri(dt) {
-  const q = antriPemain.q, idx = q.list.indexOf('pemain');
+  const q = antriPemain.q;
+  if (antriPemain.datang) {
+    // berjalan ke ujung antrean; kalau ada orang lain sampai duluan, kita di belakangnya
+    const [ex, ez] = slotAntri(q, q.list.length);
+    if (Math.hypot(ex - player.x, ez - player.z) < 0.4) { antriPemain.datang = false; q.list.push('pemain'); }
+  }
+  const idx = antriPemain.datang ? q.list.length : q.list.indexOf('pemain');
   const [tx, tz] = slotAntri(q, idx);
   const dx = tx - player.x, dz = tz - player.z, d = Math.hypot(dx, dz);
   if (d > 0.05) { const st = Math.min(d, 2 * dt); player.x += dx / d * st; player.z += dz / d * st; }
@@ -1913,6 +1928,7 @@ function bukaFilm() {
   const html = film + `<div class="catatan">🎟️ Tiket ${fmtRp(hT)} per orang</div>` +
     '<p class="label">Popcorn & minuman</p><div class="menu">' + baris('pop', '🍿 Popcorn', hP) + baris('min', '🥤 Minuman', hM) + '</div>' +
     (daftar.length ? '<label class="menu-item"><input type="checkbox" id="snack-saja"><span>Beli popcorn & minum saja, tidak nonton</span></label>' : '') +
+    (daftar.length ? `<p class="label">Cara nonton</p><div class="menu"><label class="menu-item"><input type="radio" name="cara" value="3d" ${BIOS.cara !== 'penuh' ? 'checked' : ''}><span>🎬 Layar bioskop 3D<small>Nonton dari kursi kalian, layar besar di depan</small></span></label><label class="menu-item"><input type="radio" name="cara" value="penuh" ${BIOS.cara === 'penuh' ? 'checked' : ''}><span>📺 Layar penuh<small>Film muncul sebagai popup memenuhi layar HP</small></span></label></div><div class="catatan">Film YouTube selalu diputar layar penuh. Saat film diputar, kalian bisa pindah cara nonton dengan tombol ⛶.</div>` : '') +
     (daftar.length ? denahKursi() : '') +
     `<div class="total">Total: <b id="total">-</b></div><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)}</div>`;
   const hitung = () => {
@@ -1926,7 +1942,7 @@ function bukaFilm() {
     if (!r.saja && !BIOS.pilih) { hint('Pilih kursi dulu di denah ya 🎟️', 3000); setTimeout(bukaFilm, 300); return; }
     if (!bayar(r.tot)) { hint(`Uangnya nggak cukup. Totalnya ${fmtRp(r.tot)}, sisa uang ${fmtRp(DOMPET.sisa)}.`, 3800); return; }
     if (r.pop || r.min) { aturBawa(r.pop, r.min); setTimeout(() => bicara(BAWA.cewek.length ? 'Kamu bawa satu, aku bawa satu ya.' : 'Biar aku yang bawa popcorn sama minumnya.', 3.5), 400); }
-    if (!r.saja) { const x = document.querySelector('#k-isi input[name=film]:checked'); mulaiFilm(daftar[x ? +x.value : 0], BIOS.pilih); }
+    if (!r.saja) { const c = document.querySelector('#k-isi input[name=cara]:checked'); BIOS.cara = c ? c.value : '3d'; const x = document.querySelector('#k-isi input[name=film]:checked'); mulaiFilm(daftar[x ? +x.value : 0], BIOS.pilih); }
   });
   const segar = () => { const r = hitung(); $('total').textContent = fmtRp(r.tot) + (r.tot > DOMPET.sisa ? ' (uang kurang)' : ''); $('k-aksi').textContent = r.saja ? 'Beli' : 'Bayar & nonton 🍿'; };
   $('k-isi').onclick = (e) => {
@@ -2028,28 +2044,40 @@ function putarFilm() {
   const f = BIOS.film; if (!f) return;
   BIOS.status = 'putar';
   const P = F.pembuka || {}, atas = String(P.atas || '-- C --'), bawah = String(P.bawah || 'Mempersembahkan');
-  $('yt-frame').style.display = 'none'; $('film-tempat').innerHTML = ''; $('film-judul').classList.add('sembunyi');
-  $('intro-atas').textContent = ''; $('intro-bawah').textContent = ''; $('intro').classList.remove('sembunyi', 'pudar'); $('yt').classList.add('intro');
-  $('yt').classList.remove('sembunyi');
-  BIOS.layarMat.map = textTex([atas, bawah], { w: 1024, h: 440, size: 80, size2: 52, bg: '#000000', border: '#000000' }); BIOS.layarMat.needsUpdate = true;
+  const penuh = BIOS.cara === 'penuh' || !!BIOS.yt;
+  $('yt-frame').style.display = 'none'; $('film-tempat').innerHTML = ''; $('film-judul').classList.add('sembunyi'); $('film-3d').classList.add('sembunyi');
+  const tulisLayar = (a, b) => { const lama = BIOS.layarMat.map; BIOS.layarMat.map = textTex([a || ' ', b || ' '], { w: 1024, h: 440, size: 96, size2: 50, bg: '#000000', border: '#000000' }); BIOS.layarMat.needsUpdate = true; if (lama && lama !== BIOS.vt && lama.userData.intro) lama.dispose(); BIOS.layarMat.map.userData.intro = true; };
+  if (penuh) {
+    $('intro-atas').textContent = ''; $('intro-bawah').textContent = ''; $('intro').classList.remove('sembunyi', 'pudar'); $('yt').classList.add('intro');
+    $('yt').classList.remove('sembunyi');
+  }
+  tulisLayar('', '');
   const T = BIOS.introT = []; const nanti = (fn, ms) => T.push(setTimeout(fn, ms));
+  const tampil = (a, b) => { if (penuh) { $('intro-atas').textContent = a; $('intro-bawah').textContent = b; } else tulisLayar(a, b); };
   let ms = 500;
-  [...atas].forEach((c, i) => nanti(() => { $('intro-atas').textContent = atas.slice(0, i + 1); }, ms += 160));
+  [...atas].forEach((c, i) => nanti(() => tampil(atas.slice(0, i + 1), ''), ms += 160));
   ms += 450;
-  [...bawah].forEach((c, i) => nanti(() => { $('intro-bawah').textContent = bawah.slice(0, i + 1); }, ms += 110));
-  nanti(() => $('intro').classList.add('pudar'), ms += 1600);
-  nanti(() => { $('intro').classList.add('sembunyi'); $('yt').classList.remove('intro'); mulaiPutarFilm(); }, ms + 850);
+  [...bawah].forEach((c, i) => nanti(() => tampil(atas, bawah.slice(0, i + 1)), ms += 110));
+  nanti(() => { if (penuh) $('intro').classList.add('pudar'); else tulisLayar('', ''); }, ms += 1600);
+  nanti(() => { $('intro').classList.add('sembunyi'); $('yt').classList.remove('intro'); mulaiPutarFilm(penuh); }, ms + 850);
 }
-function mulaiPutarFilm() {
+// pindah cara nonton saat film diputar: layar bioskop 3D <-> layar penuh (hanya video upload / link)
+function aturLayar(penuh) {
+  const v = BIOS.video; if (!v || BIOS.status !== 'putar') return;
+  BIOS.cara = penuh ? 'penuh' : '3d';
+  if (penuh) { v.controls = true; $('film-tempat').appendChild(v); $('film-3d').classList.remove('sembunyi'); $('yt').classList.remove('sembunyi'); $('btn-putar').classList.add('sembunyi'); $('btn-layar').classList.add('sembunyi'); }
+  else { $('film-simpan').appendChild(v); $('yt').classList.add('sembunyi'); $('film-3d').classList.add('sembunyi'); $('btn-putar').classList.remove('sembunyi'); $('btn-putar').textContent = v.paused ? '▶' : '⏸'; $('btn-layar').classList.remove('sembunyi'); }
+  if (v.paused) v.play().catch(() => {});
+}
+function mulaiPutarFilm(penuh) {
   const f = BIOS.film; if (!f || BIOS.status !== 'putar') return;
   if (BIOS.video) {
-    const v = BIOS.video; v.controls = true; $('film-tempat').appendChild(v);
     BIOS.layarMat.map = BIOS.vt; BIOS.layarMat.needsUpdate = true;
     BIOS.video.currentTime = 0; BIOS.video.play().catch(() => { hint('Ketuk ▶ untuk memutar film.', 3000); });
-    $('btn-putar').classList.remove('sembunyi'); $('btn-putar').textContent = '⏸';
+    aturLayar(!!penuh);
   } else if (!BIOS.yt) {
     BIOS.layarMat.map = textTex([f.judul, '▶ Sedang diputar'], { w: 1024, h: 440, size: 80, size2: 52, bg: '#1d2440', border: '#1d2440' }); BIOS.layarMat.needsUpdate = true;
-    $('film-judul').textContent = '🎬 ' + f.judul; $('film-judul').classList.remove('sembunyi');
+    if (penuh) { $('film-judul').textContent = '🎬 ' + f.judul; $('film-judul').classList.remove('sembunyi'); }
   } else if (BIOS.yt) {
     $('yt-frame').style.display = ''; $('yt-frame').src = `https://www.youtube.com/embed/${BIOS.yt}?autoplay=1&playsinline=1&rel=0`;
   }
@@ -2075,8 +2103,8 @@ function selesaiFilm(diam) {
   if (BIOS.video) { BIOS.video.pause(); BIOS.video.removeAttribute('src'); BIOS.video.load(); BIOS.video = null; }
   if (BIOS.vt) { BIOS.vt.dispose(); BIOS.vt = null; }
   BIOS.yt = null; $('yt-frame').src = 'about:blank'; $('yt').classList.add('sembunyi');
-  (BIOS.introT || []).forEach(clearTimeout); BIOS.introT = []; $('film-tempat').innerHTML = ''; $('intro').classList.add('sembunyi'); $('yt').classList.remove('intro');
-  $('btn-putar').classList.add('sembunyi');
+  (BIOS.introT || []).forEach(clearTimeout); BIOS.introT = []; $('film-tempat').innerHTML = ''; $('film-simpan').innerHTML = ''; $('intro').classList.add('sembunyi'); $('yt').classList.remove('intro');
+  $('btn-putar').classList.add('sembunyi'); $('btn-layar').classList.add('sembunyi'); $('film-3d').classList.add('sembunyi');
   BIOS.status = 'kosong'; BIOS.film = null;
   BIOS.layarMat.map = textTex(['Pilih film di loket', '🎬'], { w: 1024, h: 440, size: 80, size2: 120, bg: '#1d1d26', border: '#1d1d26' }); BIOS.layarMat.needsUpdate = true;
   for (const N of BIOS.penonton) { N.duduk = false; N.jalur = [[N.kursi.x, N.kursi.z - 0.66], [68.6, N.kursi.z - 0.66], [68.6, 78], [67.3, 78], [67.3, 84], [rand(50, 75), 88]]; N.pergi = true; N.tunda = rand(0, 3); }
@@ -2269,6 +2297,8 @@ function updateTegur(dt) {
 }
 $('btn-berdiri').onclick = berdiri;
 $('btn-makan').onclick = mulaiMakan;
+$('btn-layar').onclick = () => aturLayar(true);
+$('film-3d').onclick = () => aturLayar(false);
 $('btn-putar').onclick = () => { const v = BIOS.video; if (!v) return; if (v.paused) { v.play(); $('btn-putar').textContent = '⏸'; } else { v.pause(); $('btn-putar').textContent = '▶'; } };
 $('yt-tutup').onclick = () => { if (duduk && duduk.bioskop) keluarBioskop(); else berdiri(); };
 /* papan nama setiap area */

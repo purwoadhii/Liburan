@@ -26,6 +26,7 @@
   <div id="joy"><div id="joy-dasar"></div><div id="joy-tuas"></div></div>
   <div id="kanan-bawah">
     <button id="btn-putar" class="tbl sembunyi">⏸</button>
+    <button id="btn-layar" class="tbl sembunyi">⛶</button>
     <button id="btn-antri" class="sembunyi">Keluar antrean</button>
     <button id="btn-makan" class="sembunyi">🍽️ Makan</button>
     <button id="btn-berdiri" class="sembunyi">Berdiri</button>
@@ -103,10 +104,11 @@
   </div>
 </div>
 
+<div id="film-simpan" style="position:fixed;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none;left:0;top:0"></div>
 <div id="yt" class="layar-penuh sembunyi">
   <div id="intro" class="sembunyi"><div id="intro-atas"></div><div id="intro-bawah"></div></div>
   <div class="yt-bingkai"><div id="film-judul" class="sembunyi"></div><div id="film-tempat"></div><iframe id="yt-frame" title="Film" allow="autoplay; encrypted-media; fullscreen"></iframe>
-  <button id="yt-tutup">Keluar dari bioskop</button></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button id="film-3d" class="sembunyi">🎬 Tonton di layar bioskop</button><button id="yt-tutup">Keluar dari bioskop</button></div></div>
 </div>
 
 <div id="galat" class="layar-penuh sembunyi"><div class="kartu-info"><h2>Maaf</h2><p>Perangkat ini belum bisa menampilkan 3D (WebGL). Coba buka di Chrome atau Safari terbaru.</p></div></div>
