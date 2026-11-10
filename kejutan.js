@@ -11,12 +11,14 @@ window.KEJUTAN = {
   "jerapah": "Bunga ini dari jerapah. Katanya, kamu cantik sekali hari ini 🌸",
   "kunang": "I ❤ U",
   "kenangan": {
-    "pesan": "Terima kasih sudah menemani setiap hari. Semoga kita selalu bersama 💞"
+    "pesan": "Terima kasih sudah menemani setiap hari. Semoga kita selalu bersama 💞",
+    "foto": [],
+    "video": ""
   },
   "ultah": {
     "aktif": true,
-    "nama": "",
-    "ucapan": "Semoga semua harapanmu terkabul. Terima kasih sudah jadi orang paling spesial 💖",
+    "nama": "Elsa Laila F",
+    "ucapan": "Terima kasih sudah jadi orang paling spesial 💖",
     "kataPasangan": "Selamat ulang tahun, sayang. Semoga semua harapanmu terkabul. 💖",
     "lagu": ""
   },
