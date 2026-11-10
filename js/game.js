@@ -4460,7 +4460,10 @@ function updateLamaran(dt, t) {
 putar.push(updateLamaran);
 
 /* ================================================================== papan informasi: peta, jam buka, jadwal jip & shuttle, harga, acara */
-const PAPAN_INFO = [[39, 78, 0, 'Gerbang'], [11, 24, 0, 'Terminal Safari'], [62, 86, 0, 'Food Court & Bioskop'], [27.5, 63, -1.57, 'Taman Bermain'], [8.8, -176, -0.4, 'Stasiun Air Terjun']].map(([x, z, rot, nama]) => {
+const PAPAN_INFO = [[39, 78, 0, 'Gerbang'], [11, 24, 0, 'Terminal Safari'], [62, 86, 0, 'Food Court & Bioskop'], [27.5, 63, -1.57, 'Taman Bermain'], [8.8, -176, -0.4, 'Stasiun Air Terjun'],
+  [40, 101, 3.14, 'Parkir'], [37, 22, -1.2, 'Kebun Binatang Mini'], [18, -28, -1.4, 'Area Rekreasi'], [15.5, -56, -1.4, 'Taman Burung & Harimau'], [13, -88, -1.4, 'Beruang Madu'],
+  [10, -122, -1.4, 'Panda & Perkemahan'], [-27, 52, 0.4, 'Halte Gajah & Singa'], [-30, -36, 2.4, 'Halte Jerapah & Zebra']].map(([x0, z0, rot, nama]) => {
+  const pp = { x: x0, z: z0 }; resolve(pp, 1.6); const x = pp.x, z = pp.z;   // jangan menimpa pohon / pagar
   const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g);
   for (const sx of [-1.45, 1.45]) mesh(cyl(0.09, 0.09, 3.2, 6), '#4a3d30', sx, 1.6, 0, g);
   mesh(box(3.6, 0.12, 0.7), '#2f5d3a', 0, 3.25, 0, g, false);
