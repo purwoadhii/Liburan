@@ -60,6 +60,9 @@ progress{width:100%;height:10px}
       <h2 style="margin:0">Pengaturan</h2>
       <label for="penonton">Jumlah penonton lain di bioskop</label>
       <input id="penonton" type="number" min="0" max="60" value="24">
+      <label for="pembuka-atas">Pembuka sebelum film (baris atas)</label><input id="pembuka-atas" maxlength="30" placeholder="-- C --">
+      <label for="pembuka-bawah">Pembuka sebelum film (baris bawah)</label><input id="pembuka-bawah" maxlength="40" placeholder="Mempersembahkan">
+      <small>Tampil layar penuh di tengah, hurufnya muncul satu per satu, lalu film diputar layar penuh.</small>
       <div class="baris"><button class="utama" id="simpan-pengaturan">Simpan</button></div>
     </div>
     <div class="kartu" id="k-kejutan">
@@ -157,6 +160,7 @@ async function muat() {
   }
   data.daftar = data.daftar || [];
   $('penonton').value = data.penonton != null ? data.penonton : 24;
+  $('pembuka-atas').value = (data.pembuka && data.pembuka.atas) || ''; $('pembuka-bawah').value = (data.pembuka && data.pembuka.bawah) || '';
   tampil();
 }
 function slotHtml(i) {
@@ -264,7 +268,8 @@ async function kosongkan(i) {
 });
 $('simpan-pengaturan').onclick = async () => {
   data.penonton = Math.max(0, Math.min(60, +$('penonton').value || 0));
-  try { await simpanData('Ubah jumlah penonton'); status('Tersimpan.'); } catch (er) { status('Gagal: ' + er.message, 6000); }
+  data.pembuka = { atas: $('pembuka-atas').value.trim(), bawah: $('pembuka-bawah').value.trim() };
+  try { await simpanData('Ubah pengaturan bioskop'); status('✅ Pengaturan bioskop tersimpan.', 4000); } catch (er) { status('Gagal: ' + er.message, 6000); }
 };
 
 // ---------- kejutan ----------

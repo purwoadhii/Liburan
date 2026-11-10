@@ -2023,18 +2023,35 @@ function mulaiFilm(f, pilih) {
     BIOS.penonton.push(N);
   }
 }
+// pembuka layar penuh: tulisan muncul satu per satu di tengah, lalu film diputar layar penuh
 function putarFilm() {
   const f = BIOS.film; if (!f) return;
   BIOS.status = 'putar';
+  const P = F.pembuka || {}, atas = String(P.atas || '-- C --'), bawah = String(P.bawah || 'Mempersembahkan');
+  $('yt-frame').style.display = 'none'; $('film-tempat').innerHTML = ''; $('film-judul').classList.add('sembunyi');
+  $('intro-atas').textContent = ''; $('intro-bawah').textContent = ''; $('intro').classList.remove('sembunyi', 'pudar'); $('yt').classList.add('intro');
+  $('yt').classList.remove('sembunyi');
+  BIOS.layarMat.map = textTex([atas, bawah], { w: 1024, h: 440, size: 80, size2: 52, bg: '#000000', border: '#000000' }); BIOS.layarMat.needsUpdate = true;
+  const T = BIOS.introT = []; const nanti = (fn, ms) => T.push(setTimeout(fn, ms));
+  let ms = 500;
+  [...atas].forEach((c, i) => nanti(() => { $('intro-atas').textContent = atas.slice(0, i + 1); }, ms += 160));
+  ms += 450;
+  [...bawah].forEach((c, i) => nanti(() => { $('intro-bawah').textContent = bawah.slice(0, i + 1); }, ms += 110));
+  nanti(() => $('intro').classList.add('pudar'), ms += 1600);
+  nanti(() => { $('intro').classList.add('sembunyi'); $('yt').classList.remove('intro'); mulaiPutarFilm(); }, ms + 850);
+}
+function mulaiPutarFilm() {
+  const f = BIOS.film; if (!f || BIOS.status !== 'putar') return;
   if (BIOS.video) {
+    const v = BIOS.video; v.controls = true; $('film-tempat').appendChild(v);
     BIOS.layarMat.map = BIOS.vt; BIOS.layarMat.needsUpdate = true;
     BIOS.video.currentTime = 0; BIOS.video.play().catch(() => { hint('Ketuk ▶ untuk memutar film.', 3000); });
     $('btn-putar').classList.remove('sembunyi'); $('btn-putar').textContent = '⏸';
   } else if (!BIOS.yt) {
     BIOS.layarMat.map = textTex([f.judul, '▶ Sedang diputar'], { w: 1024, h: 440, size: 80, size2: 52, bg: '#1d2440', border: '#1d2440' }); BIOS.layarMat.needsUpdate = true;
+    $('film-judul').textContent = '🎬 ' + f.judul; $('film-judul').classList.remove('sembunyi');
   } else if (BIOS.yt) {
-    $('yt-frame').src = `https://www.youtube.com/embed/${BIOS.yt}?autoplay=1&playsinline=1&rel=0`;
-    $('yt').classList.remove('sembunyi');
+    $('yt-frame').style.display = ''; $('yt-frame').src = `https://www.youtube.com/embed/${BIOS.yt}?autoplay=1&playsinline=1&rel=0`;
   }
 }
 // film selesai / berhenti nonton: penonton keluar sendiri, kalian berjalan keluar dari kursi ke pintu bioskop
@@ -2058,6 +2075,7 @@ function selesaiFilm(diam) {
   if (BIOS.video) { BIOS.video.pause(); BIOS.video.removeAttribute('src'); BIOS.video.load(); BIOS.video = null; }
   if (BIOS.vt) { BIOS.vt.dispose(); BIOS.vt = null; }
   BIOS.yt = null; $('yt-frame').src = 'about:blank'; $('yt').classList.add('sembunyi');
+  (BIOS.introT || []).forEach(clearTimeout); BIOS.introT = []; $('film-tempat').innerHTML = ''; $('intro').classList.add('sembunyi'); $('yt').classList.remove('intro');
   $('btn-putar').classList.add('sembunyi');
   BIOS.status = 'kosong'; BIOS.film = null;
   BIOS.layarMat.map = textTex(['Pilih film di loket', '🎬'], { w: 1024, h: 440, size: 80, size2: 120, bg: '#1d1d26', border: '#1d1d26' }); BIOS.layarMat.needsUpdate = true;
