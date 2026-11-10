@@ -162,6 +162,7 @@ async function muat() {
 function slotHtml(i) {
   return `<div class="kartu" data-slot="${i}">
     <div class="film" style="padding-top:0"><div class="kosong" id="pv-${i}">🎬</div><div class="isi"><h2 style="margin:0">Film ${i + 1}</h2><span id="ket-${i}">Belum diisi</span></div></div>
+    <div id="ada-${i}" class="kecil" style="margin:8px 0"></div>
     <label>Judul</label><input id="judul-${i}" maxlength="80" placeholder="Judul film ${i + 1}">
     <label>Sinopsis singkat</label><textarea id="sinopsis-${i}" maxlength="300"></textarea>
     <label>Poster (opsional)</label><input id="poster-${i}" type="file" accept="image/*">
@@ -192,7 +193,11 @@ function tampil() {
     $('link-' + i).value = s === 'link' ? f.video : ''; $('yt-' + i).value = f.youtube || '';
     $('poster-' + i).value = ''; $('video-' + i).value = '';
     $('pv-' + i).outerHTML = f.poster ? `<img id="pv-${i}" src="../${esc(f.poster)}?t=${Date.now()}" alt="">` : `<div class="kosong" id="pv-${i}">🎬</div>`;
-    $('ket-' + i).textContent = !f.judul ? 'Belum diisi' : f.youtube ? 'YouTube' : f.video ? (f.video.startsWith('film/') ? 'Video sudah diunggah' : 'Link video') : 'Judul saja (belum ada video)';
+    const jenis = f.youtube ? 'YouTube' : f.video ? (f.video.startsWith('film/') ? 'Video sudah diunggah' : 'Link video') : 'Judul saja, belum ada video';
+    $('ket-' + i).innerHTML = !f.judul ? '<span style="display:inline-block;margin-top:4px;padding:3px 10px;border-radius:99px;background:#ece6da;color:#6b6257;font-size:13px">Belum ada film</span>'
+      : `<span style="display:inline-block;margin-top:4px;padding:3px 10px;border-radius:99px;background:${f.youtube || f.video ? '#dff3e2;color:#1f6b2e' : '#fff1cf;color:#7a5a00'};font-size:13px">✅ Tersimpan: <b>${esc(f.judul)}</b></span><br><small>${jenis}</small>`;
+    $('ada-' + i).innerHTML = !f.judul ? '' : f.video && f.video.startsWith('film/') ? `🎞️ Video yang tersimpan (${esc(f.video.split('/').pop())}):<video src="../${esc(f.video)}" controls preload="metadata" playsinline style="width:100%;max-height:200px;margin-top:4px;border-radius:8px;background:#000"></video>`
+      : f.video ? `🔗 Link tersimpan: <a href="${esc(f.video)}" target="_blank">${esc(f.video)}</a>` : f.youtube ? `▶️ YouTube tersimpan: <a href="${esc(f.youtube)}" target="_blank">${esc(f.youtube)}</a>` : '⚠️ Belum ada video. Di bioskop hanya judulnya yang tampil.';
   });
 }
 async function simpanData(pesan) {
@@ -236,7 +241,9 @@ async function simpanSlot(i) {
     status('Menyimpan daftar film…', 0);
     await simpanData('Film ' + (i + 1) + ': ' + judul);
     tampil();
-    status('Film ' + (i + 1) + ' tersimpan! Muncul di game dalam 1–2 menit.', 4000);
+    status('✅ Film ' + (i + 1) + ' "' + judul + '" tersimpan! Muncul di game dalam 1–2 menit.', 6000);
+    btn.textContent = '✅ Tersimpan'; setTimeout(() => { btn.textContent = 'Simpan film ' + (i + 1); }, 4000);
+    $('ada-' + i).scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (er) { status('Gagal: ' + er.message, 7000); }
   $('progres-' + i).classList.add('sembunyi'); btn.disabled = false;
 }
