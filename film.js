@@ -10,7 +10,11 @@ window.FILM = {
       "youtube": ""
     },
     {
-      "judul": ""
+      "judul": "tester 2",
+      "sinopsis": "",
+      "poster": "",
+      "video": "film/tester-2-mwa79tma.mp4",
+      "youtube": ""
     },
     {
       "judul": ""
