@@ -23,5 +23,9 @@ window.FILM = {
       "video": "film/testter-3-mwa7avrl.mp4",
       "youtube": ""
     }
-  ]
+  ],
+  "pembuka": {
+    "atas": "C",
+    "bawah": "Mempersembahkan"
+  }
 };
