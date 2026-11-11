@@ -1292,7 +1292,8 @@ const arahAntri = (q) => Math.atan2(q.dir[0], q.dir[1]);
 function npcGedung(N, id) { N.gedung = id; return N; }
 function kursiKosong() {
   const bebas = [];
-  for (const m of MEJA) for (const k of m.kursiU) if (!k.n) bebas.push(k);
+  // meja yang sedang kita duduki tidak dipilih: orang lain harus minta izin dulu (lihat NUMPANG)
+  for (const m of MEJA) if (!(duduk && duduk.meja === m)) for (const k of m.kursiU) if (!k.n) bebas.push(k);
   return bebas.length ? pick(bebas) : null;
 }
 function tambahKeAntrian(q, N) {
@@ -1852,6 +1853,15 @@ function animMakan(dt) {
   return true;
 }
 function dudukMeja(m) {
+  if (duduk && duduk.meja === m) return;   // sudah duduk di meja ini
+  // orang yang masih berjalan ke kursi di meja ini: kita duduk duluan, jadi mereka cari kursi lain
+  for (const k of m.kursiU) {
+    const N = k.n; if (!N || N.duduk || N === NUMPANG.N) continue;
+    k.n = null; N.kursiFC = null;
+    const lain = MEJA.filter(x => x !== m).flatMap(x => x.kursiU).filter(c => !c.n);
+    if (lain.length) { const c = pick(lain); c.n = N; N.kursiFC = c; N.jalur = [[N.x, c.z - 1.3], [c.x, c.z - 1.3], [c.x, c.z]]; N.onArrive = () => { npcDuduk(N, c.x, c.z, Math.PI); N.makan = true; N.makanSisa = rand(25, 50); }; }
+    else { N.onArrive = null; N.jalur = [FC_PINTU, [rand(40, 85), 88]]; N.pergi = true; }
+  }
   duduk = { meja: m, a: [m.x - 0.45, m.z + 0.85], b: [m.x + 0.45, m.z + 0.85], yaw: 0, sejak: 0 };
   // kalau di depan sudah ada orang, dia mengeluh lalu pergi
   const depan = m.kursiU.map(k => k.n).filter(N => N && N.duduk);
@@ -4811,4 +4821,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSemprot(dt); updateS
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
