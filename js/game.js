@@ -109,6 +109,21 @@ function buildGrid() {
       for (let z = Math.floor(Math.min(s.z1, s.z2) / CELL); z <= Math.floor(Math.max(s.z1, s.z2) / CELL); z++) put(x, z, s);
   }
 }
+// bagian terdekat (0..1) dari garis (x1,z1)->(x2,z2) yang menabrak dinding/pagar; 1 kalau tidak terhalang
+function potongSeg(x1, z1, x2, z2) {
+  let best = 1; const dx = x2 - x1, dz = z2 - z1;
+  const c0 = Math.floor(Math.min(x1, x2) / CELL) - 1, c1 = Math.floor(Math.max(x1, x2) / CELL) + 1, r0 = Math.floor(Math.min(z1, z2) / CELL) - 1, r1 = Math.floor(Math.max(z1, z2) / CELL) + 1;
+  for (let gx = c0; gx <= c1; gx++) for (let gz = r0; gz <= r1; gz++) {
+    const list = grid.get(gx + ',' + gz); if (!list) continue;
+    for (const o of list) {
+      if (o.r !== undefined) continue;
+      const ex = o.x2 - o.x1, ez = o.z2 - o.z1, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) continue;
+      const t = ((o.x1 - x1) * ez - (o.z1 - z1) * ex) / den, u = ((o.x1 - x1) * dz - (o.z1 - z1) * dx) / den;
+      if (t >= 0 && t < best && u >= -0.02 && u <= 1.02) best = t;
+    }
+  }
+  return best;
+}
 const BATAS = { x1: -148, x2: 88, z1: -238, z2: 132 };
 function resolve(p, r) {
   for (let it = 0; it < 2; it++) {
@@ -3757,12 +3772,20 @@ function update(dt, t) {
   // pasangan: di depan-kanan saat FPP (menuntun), di samping saat TPP
   const pf = AUTO ? -0.85 : lerp(1.5, 0.05, e), pr = AUTO ? 0.05 : lerp(0.42, 0.74, e);
   const fX = -Math.sin(player.yaw), fZ = -Math.cos(player.yaw), rX = Math.cos(player.yaw), rZ = -Math.sin(player.yaw);
-  const tx = player.x + fX * pf + rX * pr, tz = player.z + fZ * pf + rZ * pr;
+  let tx = player.x + fX * pf + rX * pr, tz = player.z + fZ * pf + rZ * pr;
+  { // si cowok tidak boleh menembus dinding, pagar atau kandang: tujuannya dipotong di depan penghalang
+    const tp = potongSeg(player.x, player.z, tx, tz);
+    if (tp < 1) { const L = Math.hypot(tx - player.x, tz - player.z) || 1, kk = Math.max(0, tp - 0.4 / L); tx = player.x + (tx - player.x) * kk + rX * 0.5 * (1 - kk); tz = player.z + (tz - player.z) * kk + rZ * 0.5 * (1 - kk); if (potongSeg(player.x, player.z, tx, tz) < 1) { tx = player.x - rX * 0.55; tz = player.z - rZ * 0.55; if (potongSeg(player.x, player.z, tx, tz) < 1) { tx = player.x - fX * 0.5; tz = player.z - fZ * 0.5; } } }
+  }
   const ox = partner.x, oz = partner.z;
   const k = Math.min(1, dt * 12), sendiri = !!(AUTO && AUTO.dia);
   if (!sendiri) {
-    partner.x = lerp(partner.x, tx, k); partner.z = lerp(partner.z, tz, k);
-    const pp = { x: partner.x, z: partner.z }; resolve(pp, 0.3); partner.x = pp.x; partner.z = pp.z;
+    const nx = lerp(partner.x, tx, k), nz = lerp(partner.z, tz, k);
+    if (potongSeg(ox, oz, nx, nz) >= 1) { partner.x = nx; partner.z = nz; }
+    const pp = { x: partner.x, z: partner.z }; resolve(pp, 0.3);
+    if (potongSeg(ox, oz, pp.x, pp.z) >= 1) { partner.x = pp.x; partner.z = pp.z; }
+    // sudah telanjur di balik dinding (habis pindah tempat): tarik kembali ke sisi si cewek
+    if (!duduk && potongSeg(player.x, player.z, partner.x, partner.z) < 1 && potongSeg(player.x, player.z, tx, tz) >= 1) { partner.x = tx; partner.z = tz; }
   }
   partner.speed = lerp(partner.speed, Math.hypot(partner.x - ox, partner.z - oz) / Math.max(dt, 1e-3), Math.min(1, dt * 6));
   partner.phase += partner.speed * dt * 2.3;
@@ -5232,4 +5255,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSine(dt); updateSemp
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { mulaiSuap, get SINE() { return SINE; }, HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { potongSeg, partner, mulaiSuap, get SINE() { return SINE; }, HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
