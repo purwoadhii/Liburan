@@ -1293,6 +1293,32 @@ function buatAntrian(pos, dir, jenis, data, target) {
 const slotAntri = (q, n) => [q.pos[0] + q.dir[0] * n * 0.95, q.pos[1] + q.dir[1] * n * 0.95];
 const arahAntri = (q) => Math.atan2(q.dir[0], q.dir[1]);
 function npcGedung(N, id) { N.gedung = id; return N; }
+// ---- rute jalan di food court: selalu lewat lorong, tidak memotong meja ----
+// lorong utara-selatan (di antara kolom meja x 43.5, 50, 56.5 dan di sisi kios samping) & lorong barat-timur (di antara baris meja)
+const LORONG_X = [41.7, 46.75, 53.25, 58.3], LORONG_Z = [64.1, 67.75, 72.25, 77];
+const dekat = (arr, v) => arr.reduce((a, b) => Math.abs(b - v) < Math.abs(a - v) ? b : a);
+const lorongX = (x) => dekat(LORONG_X, x);
+const sakuFC = (x, z) => z < 66 && (x < 40.9 || x > 59.1);   // antrean kios pojok ada di belakang meja kios samping
+function ruteFC(dari, tx, tz) {
+  const pts = []; let x = dari.x, z = dari.z;
+  if (sakuFC(x, z)) { const gx = x < 50 ? 42 : 58; pts.push([x, 61.33], [gx, 61.33]); x = gx; z = 61.33; }
+  if (z > 78) { pts.push([FC_PINTU[0], FC_PINTU[1]]); x = FC_PINTU[0]; z = FC_PINTU[1]; }
+  const saku = sakuFC(tx, tz), gx = saku ? (tx < 50 ? 42 : 58) : tx, gz = saku ? 64.1 : tz;
+  const az0 = dekat(LORONG_Z, z), az1 = dekat(LORONG_Z, gz);
+  pts.push([x, az0]);
+  if (az0 !== az1) { const cx = dekat(LORONG_X, (x + gx) / 2); pts.push([cx, az0], [cx, az1]); }
+  pts.push([gx, az1], [gx, gz]);
+  if (saku) pts.push([gx, 61.33], [tx, 61.33], [tx, tz]);
+  // buang titik yang berimpit
+  const r = []; let px = dari.x, pz = dari.z;
+  for (const q of pts) { if (Math.hypot(q[0] - px, q[1] - pz) > 0.12) { r.push(q); px = q[0]; pz = q[1]; } }
+  if (!r.length) r.push([tx, tz]);
+  return r;
+}
+const ruteKursi = (N, c) => ruteFC(N, c.x, c.z);
+const ruteKeluarFC = (N) => ruteFC(N, FC_PINTU[0], FC_PINTU[1]).concat([[rand(40, 85), 88]]);
+const ruteKiosKeluar = ruteKeluarFC;
+const ruteKeAntrean = (N, tx, tz) => ruteFC(N, tx, tz);
 function kursiKosong() {
   const bebas = [];
   // meja yang sedang kita duduki tidak dipilih: orang lain harus minta izin dulu (lihat NUMPANG)
@@ -1317,9 +1343,9 @@ function selesaiLayan(q, N) {
     const k = kursiKosong();
     if (k && Math.random() < 0.8) {
       k.n = N; N.kursiFC = k;
-      N.jalur = [[N.x, k.z - 1.3], [k.x, k.z - 1.3], [k.x, k.z]];
+      N.jalur = ruteKursi(N, k);
       N.onArrive = () => { npcDuduk(N, k.x, k.z, Math.PI); N.makan = true; N.makanSisa = rand(25, 50); };
-    } else { N.jalur = [FC_PINTU, [rand(40, 85), 88]]; N.pergi = true; }
+    } else { N.jalur = ruteKiosKeluar(N); N.pergi = true; }
   } else if (q.jenis === 'masuk') {
     N.jalur = [[q.pos[0], 96], [30, 96], [30, 86], [30 + rand(-2, 2), 72], [26 + rand(-2, 2), 40]]; N.pergi = true;
   } else {
@@ -1336,9 +1362,9 @@ function updateAntrian(dt) {
       const N = q.datang[i], [tx, tz] = slotAntri(q, q.list.length);
       if (Math.hypot(tx - N.x, tz - N.z) < 0.6) { q.datang.splice(i, 1); N.menujuAntri = null; tambahKeAntrian(q, N); continue; }
       const akhir = N.jalur[N.jalur.length - 1];
-      if (!akhir || Math.hypot(akhir[0] - tx, akhir[1] - tz) > 0.1) N.jalur = [[tx, tz]];
+      if (!akhir || Math.hypot(akhir[0] - tx, akhir[1] - tz) > 0.1) N.jalur = q.jenis === 'kios' ? ruteKeAntrean(N, tx, tz) : [[tx, tz]];
     }
-    if (npcN > q.target + 1 && q.list.length && q.list[q.list.length - 1] !== 'pemain' && Math.random() < dt * 0.05) { const N = q.list.pop(); N.antri = null; N.jalur = q.jenis === 'kios' ? [FC_PINTU, [rand(40, 85), 88]] : q.jenis === 'masuk' ? [[rand(8, 52), 120]] : [[rand(52, 84), 89]]; N.pergi = true; }
+    if (npcN > q.target + 1 && q.list.length && q.list[q.list.length - 1] !== 'pemain' && Math.random() < dt * 0.05) { const N = q.list.pop(); N.antri = null; N.jalur = q.jenis === 'kios' ? ruteKiosKeluar(N) : q.jenis === 'masuk' ? [[rand(8, 52), 120]] : [[rand(52, 84), 89]]; N.pergi = true; }
     q.list.forEach((m, idx) => {
       if (m === 'pemain') return;
       const [tx, tz] = slotAntri(q, idx);
@@ -1781,7 +1807,7 @@ function kirimPelayan(m) {
     mesh(box(0.55, 0.03, 0.38), '#6b4a2b', 0, 0, 0, baki, false);
     const diBaki = items.slice(0, 4).map((p, j) => { const h = modelHidangan({ ...p }, baki); h.position.set(-0.15 + (j % 2) * 0.3, 0.02, -0.08 + Math.floor(j / 2) * 0.16); h.scale.setScalar(0.8); return h; });
     const sisi = n % 2 ? -1 : 1;
-    N.jalur = [[m.x + sisi * 1.45, m.z + 1.9], [m.x + sisi * 1.4, m.z + 0.35]];
+    N.jalur = ruteFC(N, m.x + sisi * 1.45, m.z + 1.9).concat([[m.x + sisi * 1.4, m.z + 0.35]]);
     pelayanAktif++;
     N.onArrive = () => {
       N.yaw = sisi > 0 ? Math.PI / 2 : -Math.PI / 2; N.diamT = 1.2;
@@ -1799,7 +1825,7 @@ function kirimPelayan(m) {
         N.P.group.remove(baki); N.bawa = false;
         npcBicara = N; npcBicaraT = 2.6; npcKonteks = 'pelayan'; gelNpc.textContent = pick(['Silakan, selamat menikmati!', 'Selamat makan, Kak!', 'Silakan dinikmati ya.']); gelNpc.classList.remove('sembunyi');
         if (duduk && duduk.meja === m) hint('Makanan datang! Ketuk 🍽️ Makan', 3000);
-        N.jalur = [[m.x + sisi * 1.45, m.z + 1.9], k.depan]; N.pergi = true; pelayanAktif--;
+        N.jalur = [[m.x + sisi * 1.45, m.z + 1.9]].concat(ruteFC({ x: m.x + sisi * 1.45, z: m.z + 1.9 }, k.depan[0], k.depan[1])); N.pergi = true; pelayanAktif--;
       });
     };
     N.bawa = true;
@@ -1814,7 +1840,7 @@ function angkatPiring(m) {
   const k = KIOS.reduce((a, b) => Math.hypot(b.depan[0] - m.x, b.depan[1] - m.z) < Math.hypot(a.depan[0] - m.x, a.depan[1] - m.z) ? b : a);
   const N = buatNpc(k.depan, { baju: '#f8f4ea', celana: '#26262b', rambut: '#1a1a1a' });
   N.x = k.depan[0]; N.z = k.depan[1]; N.speed = 1.6; N.pelayan = true; N.tunda = 2;
-  N.jalur = [[m.x - 1.45, m.z + 1.9], [m.x - 1.4, m.z + 0.35]];
+  N.jalur = ruteFC(N, m.x - 1.45, m.z + 1.9).concat([[m.x - 1.4, m.z + 0.35]]);
   N.onArrive = () => {
     N.yaw = -Math.PI / 2; N.diamT = 1.5;
     npcBicara = N; npcBicaraT = 2.6; npcKonteks = 'pelayan'; gelNpc.textContent = pick(['Permisi, piring kosongnya saya angkat ya, Kak.', 'Saya bereskan piringnya dulu ya.']); gelNpc.classList.remove('sembunyi');
@@ -1822,7 +1848,7 @@ function angkatPiring(m) {
       pesanan = pesanan.filter(p => !(p.meja === m && p.diantar && p.sisa <= 0.02));
       taruhMakanan(m); m.angkat = false;
       const baki = new THREE.Group(); baki.position.set(0, 1.02, 0.42); N.P.group.add(baki); mesh(box(0.55, 0.03, 0.38), '#6b4a2b', 0, 0, 0, baki, false); N.bawa = true;
-      N.jalur = [[m.x - 1.45, m.z + 1.9], k.depan]; N.pergi = true;
+      N.jalur = [[m.x - 1.45, m.z + 1.9]].concat(ruteFC({ x: m.x - 1.45, z: m.z + 1.9 }, k.depan[0], k.depan[1])); N.pergi = true;
       if (pesanan.some(p => !p.dikirim) && duduk && duduk.meja === m) setTimeout(() => kirimPelayan(m), 1500);
     }, 1400);
   };
@@ -1862,9 +1888,9 @@ function pindahMeja(N, mLama) {
   const c = kursiKosong();
   if (c && !mLama.kursiU.includes(c)) {
     c.n = N; N.kursiFC = c; const sisa = Math.max(15, N.makanSisa || 30);
-    N.jalur = [[N.x, N.z - 1.3], [c.x, c.z - 1.3], [c.x, c.z]];
+    N.jalur = ruteKursi(N, c);
     N.onArrive = () => { npcDuduk(N, c.x, c.z, Math.PI); N.makan = true; N.makanSisa = sisa; };
-  } else { N.kursiFC = null; N.makan = false; N.jalur = [[N.x, N.z - 1.3], [FC_PINTU[0], N.z - 1.3 > 76 ? 76 : N.z - 1.3], FC_PINTU, [rand(40, 85), 88]]; N.pergi = true; }
+  } else { N.kursiFC = null; N.makan = false; N.jalur = ruteKeluarFC(N); N.pergi = true; }
 }
 function dudukMeja(m) {
   if (duduk && duduk.meja === m) return;   // sudah duduk di meja ini
@@ -1873,7 +1899,7 @@ function dudukMeja(m) {
     const N = k.n; if (!N || N.duduk || N === NUMPANG.N) continue;
     k.n = null; N.kursiFC = null;
     const lain = MEJA.filter(x => x !== m).flatMap(x => x.kursiU).filter(c => !c.n);
-    if (lain.length) { const c = pick(lain); c.n = N; N.kursiFC = c; N.jalur = [[N.x, c.z - 1.3], [c.x, c.z - 1.3], [c.x, c.z]]; N.onArrive = () => { npcDuduk(N, c.x, c.z, Math.PI); N.makan = true; N.makanSisa = rand(25, 50); }; }
+    if (lain.length) { const c = pick(lain); c.n = N; N.kursiFC = c; N.jalur = ruteKursi(N, c); N.onArrive = () => { npcDuduk(N, c.x, c.z, Math.PI); N.makan = true; N.makanSisa = rand(25, 50); }; }
     else { N.onArrive = null; N.jalur = [FC_PINTU, [rand(40, 85), 88]]; N.pergi = true; }
   }
   duduk = { meja: m, a: [m.x - 0.45, m.z + 0.85], b: [m.x + 0.45, m.z + 0.85], yaw: 0, sejak: 0 };
@@ -2188,9 +2214,9 @@ function updateGedung(dt, t, dalam) {
       N.P.group.position.set(N.x, 0.52 - N.P.hip + (N.kursi && !N.pergi ? N.kursi.h : 0), N.z);
       for (const l of N.P.legs) l.rotation.x = -1.45;
       if (N.makan) N.P.headParts[0].rotation.x = 0.25 + Math.sin(t * 3 + i) * 0.12;
-      if (N.makanSisa > 0) { N.makanSisa -= dt; if (N.makanSisa <= 0) { N.duduk = false; N.makan = false; N.P.headParts[0].rotation.x = 0; if (N.kursiFC) N.kursiFC.n = null; N.jalur = [[N.x, N.z - 1.3], [FC_PINTU[0], N.z - 1.3 > 76 ? 76 : N.z - 1.3], FC_PINTU, [rand(40, 85), 88]]; N.pergi = true; } }
+      if (N.makanSisa > 0) { N.makanSisa -= dt; if (N.makanSisa <= 0) { N.duduk = false; N.makan = false; N.P.headParts[0].rotation.x = 0; if (N.kursiFC) N.kursiFC.n = null; N.jalur = ruteKeluarFC(N); N.pergi = true; } }
     } else {
-      if (!N.jalur.length && N.keliling) { const b = N.keliling; N.jalur = [[rand(b.x1 + 4, b.x2 - 4), rand(b.z1 + 4, b.z2 - 3)]]; N.diamT = rand(1, 4); }
+      if (!N.jalur.length && N.keliling) { N.jalur = ruteFC(N, rand(43, 57), pick(LORONG_Z)); N.diamT = rand(1, 4); }
       if (!N.jalur.length && N.jalan) rencanaJalan(N);
       if (N.marah > 0) {
         const dx = player.x - N.x, dz = player.z - N.z, d = Math.hypot(dx, dz);
@@ -2208,8 +2234,18 @@ function updateGedung(dt, t, dalam) {
             if (N.bioskop) { N.duduk = true; N.yaw = 0; }
           }
         } else {
-          N.yaw += angDiff(N.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
-          const st = Math.min(d, N.speed * dt); N.x += dx / d * st; N.z += dz / d * st; moving = true;
+          // arah jalan; kalau tersangkut, menghindar ke samping sebentar
+          let ux = dx / d, uz = dz / d;
+          if (N.hindar > 0) { N.hindar -= dt; const sd = N.sisi || 1, c = Math.cos(1.1 * sd), sn = Math.sin(1.1 * sd); const rx = ux * c - uz * sn, rz = ux * sn + uz * c; ux = rx; uz = rz; }
+          N.yaw += angDiff(N.yaw, Math.atan2(-ux, -uz)) * Math.min(1, dt * 8);
+          const st = Math.min(d, N.speed * dt), ox = N.x, oz = N.z; N.x += ux * st; N.z += uz * st; moving = true;
+          tabrakanNpc(N, i, d < 1.2 && N.jalur.length === 1);
+          // cek tersangkut: hampir tidak maju selama 1,5 detik
+          const maju = Math.hypot(N.x - ox, N.z - oz);
+          N.macet = maju < st * 0.3 ? (N.macet || 0) + dt : Math.max(0, (N.macet || 0) - dt);
+          if (N.macet > 1.5 && d < 0.7) { N.macet = 0; N.x = tx; N.z = tz; }
+          else if (N.macet > 1.5) { N.macet = 0; N.hindar = 0.9; N.sisi = Math.random() < 0.5 ? -1 : 1; N.nMacet = (N.nMacet || 0) + 1; if (N.nMacet >= 4) { N.nMacet = 0; N.tembus = 1.2; N.statMacet = (N.statMacet || 0) + 1; } }
+          if (N.tembus > 0) N.tembus -= dt;
         }
       }
       N.phase += moving ? dt * N.speed * 2.6 : 0;
@@ -2243,6 +2279,24 @@ function updateGedung(dt, t, dalam) {
 }
 
 /* ---------- pengunjung di seluruh taman & teguran saat ditabrak ---------- */
+// pengunjung tidak menembus meja, dinding, kalian berdua, atau pengunjung lain
+function tabrakanNpc(N, i, dekatKursi) {
+  if (N.kendali) return;
+  // dorong menjauh dari kalian berdua (orang lain yang mengalah)
+  for (const P of [player, partner]) {
+    const dx = N.x - P.x, dz = N.z - P.z, d = Math.hypot(dx, dz);
+    if (d < 0.62 && d > 1e-4) { N.x = P.x + dx / d * 0.62; N.z = P.z + dz / d * 0.62; }
+  }
+  // sesama pengunjung (yang duduk tidak bergeser)
+  for (let j = 0; j < npcs.length; j++) {
+    const M = npcs[j]; if (M === N || M.local || M.vis === false || M.tunda > 0 || (M.gedung || '') !== (N.gedung || '')) continue;
+    const dx = N.x - M.x, dz = N.z - M.z; if (Math.abs(dx) > 0.6 || Math.abs(dz) > 0.6) continue;
+    const d = Math.hypot(dx, dz), r = M.duduk ? 0.5 : 0.48;
+    if (d < r && d > 1e-4) { const k = M.duduk ? 1 : 0.5; N.x += dx / d * (r - d) * k; N.z += dz / d * (r - d) * k; }
+  }
+  // meja, kursi, dinding, pagar (kecuali langkah terakhir masuk ke kursi)
+  if (!dekatKursi && !(N.tembus > 0)) { const q = { x: N.x, z: N.z }; resolve(q, 0.22); N.x = q.x; N.z = q.z; }
+}
 function rencanaJalan(N) {
   const J = N.jalan, n = J.pts.length;
   let j = N.idx + Math.round(rand(-45, 45));
@@ -4839,4 +4893,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSemprot(dt); updateS
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
