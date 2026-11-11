@@ -86,7 +86,8 @@ function textTex(lines, opt = {}) {
     c.fillStyle = opt.fg || '#fffaf0'; c.textAlign = 'center'; c.textBaseline = 'middle';
     lines.forEach((t, i) => {
       const fs = (i === 0 ? opt.size || 64 : (opt.size2 || 40));
-      c.font = `600 ${fs}px Fredoka, system-ui, sans-serif`;
+      let f2 = fs; c.font = `600 ${f2}px Fredoka, system-ui, sans-serif`;
+      while (f2 > 14 && c.measureText(t).width > w - 56) { f2 -= 2; c.font = `600 ${f2}px Fredoka, system-ui, sans-serif`; }
       c.fillText(t, w / 2, h / 2 + (i - (lines.length - 1) / 2) * (fs + 14));
     });
   });
@@ -421,7 +422,7 @@ let airTerjunMesh;
 /* ------------------------------------------------------------------ trees */
 const treeData = [];
 function farFromRoad(x, z, m) { for (const p of roadPts) { if (Math.abs(p.x - x) > 12 || Math.abs(p.z - z) > 12) continue; if (Math.hypot(p.x - x, p.z - z) < p.w + m) return false; } return true; }
-const AREA_BEBAS = [[13, 71.5, 19], [-5, 77, 14], [-9.3, 100, 13], [76, -50, 14], [60, -48, 5], [50, 68, 16], [75, 68, 17], [62, 84, 12], [40, 80, 8], [30, 116, 36], [30, 90, 12], [55, -20, 22], [-80, -135, 16], [0, -208, 15], [-28, -150, 6]];
+const AREA_BEBAS = [[8.6, -6, 2.6], [15.3, -74, 2.6], [-0.6, -128, 2.6], [36.5, 66, 2.6], [14.5, 36.5, 2], [7.6, -168, 2], [36.4, 83, 2], [19.5, -38, 2], [-21, 56.5, 2], [45, 26, 2], [13, 71.5, 19], [-5, 77, 14], [-9.3, 100, 13], [76, -50, 14], [60, -48, 5], [50, 68, 16], [75, 68, 17], [62, 84, 12], [40, 80, 8], [30, 116, 36], [30, 90, 12], [55, -20, 22], [-80, -135, 16], [0, -208, 15], [-28, -150, 6]];
 function bebasArea(x, z) { for (const [ax, az, r] of AREA_BEBAS) if (Math.hypot(x - ax, z - az) < r) return false; return true; }
 function bolehPohon(x, z) {
   if (!farFromRoad(x, z, 3)) return false;
@@ -500,19 +501,48 @@ for (let i = 0; i < 420; i++) {
   }
   bush.count = bi; flower.count = fi; bush.receiveShadow = true; scene.add(bush, flower);
 }
-// lampu taman di sepanjang jalan utama
+// lampu taman: jalan utama, jalan cabang, jalur safari dan taman bermain; malam hari tanah di bawahnya ikut terang
+const LAMPU_POS = [];
+var lampuSinar = null, lampuDekat = null;
 {
-  const c = new THREE.CatmullRomCurve3(JALAN_UTAMA.map(p => new THREE.Vector3(p[0], 0, p[1])));
-  const n = 22; const pole = new THREE.InstancedMesh(cyl(0.07, 0.09, 3.6, 6), mat('#2f3a33'), n);
+  const sepanjang = (pts, closed, jarak, geser) => {
+    const c = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p[0], 0, p[1])), closed, 'catmullrom', 0.5);
+    const n = Math.max(1, Math.round(c.getLength() / jarak));
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n, p = c.getPointAt(t), tg = c.getTangentAt(t), side = i % 2 ? 1 : -1;
+      const x = p.x - tg.z * geser * side, z = p.z + tg.x * geser * side;
+      if (x < 30 && x > 20 && z > 56 && z < 80) continue;          // jangan menutupi loket & gapura taman bermain
+      if (LAMPU_POS.some(q => Math.hypot(q[0] - x, q[1] - z) < 7)) continue;
+      LAMPU_POS.push([x, z]);
+    }
+  };
+  sepanjang(JALAN_UTAMA, false, 12, 4.6);
+  for (const c of CABANG) sepanjang(c, false, 13, 2.8);
+  sepanjang(JALUR_SAFARI, true, 26, 5);
+  for (const q of [[20.5, 75.5], [10.5, 74.5], [1.5, 75], [-9, 90.5], [-4.2, 101.5], [-14.5, 108], [21, 60.5], [45, 88], [62, 92], [78, 88]]) LAMPU_POS.push(q);
+  const n = LAMPU_POS.length;
+  const pole = new THREE.InstancedMesh(cyl(0.07, 0.09, 3.6, 6), mat('#2f3a33'), n);
   const lamp = new THREE.InstancedMesh(sph(0.25, 8, 6), lampuMat = new THREE.MeshLambertMaterial({ color: '#fff4c9', emissive: '#7a6a3a' }), n);
-  const m4 = new THREE.Matrix4();
-  for (let i = 0; i < n; i++) {
-    const t = (i + 0.5) / n, p = c.getPointAt(t), tg = c.getTangentAt(t), side = i % 2 ? 1 : -1;
-    const x = p.x - tg.z * 4.6 * side, z = p.z + tg.x * 4.6 * side;
-    if (x < 30 && z > 56 && z < 80) { m4.makeTranslation(0, -50, 0); pole.setMatrixAt(i, m4); lamp.setMatrixAt(i, m4); continue; }
+  const tSinar = tex(128, 128, (c, w, h) => { const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); g.addColorStop(0, 'rgba(255,226,150,1)'); g.addColorStop(0.45, 'rgba(255,214,130,0.5)'); g.addColorStop(1, 'rgba(255,200,110,0)'); c.clearRect(0, 0, w, h); c.fillStyle = g; c.fillRect(0, 0, w, h); });
+  lampuSinar = new THREE.MeshBasicMaterial({ map: tSinar, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const sinar = new THREE.InstancedMesh(new THREE.PlaneGeometry(15, 15), lampuSinar, n);
+  const m4 = new THREE.Matrix4(), rx = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+  LAMPU_POS.forEach(([x, z], i) => {
     m4.makeTranslation(x, 1.8, z); pole.setMatrixAt(i, m4); m4.makeTranslation(x, 3.7, z); lamp.setMatrixAt(i, m4); addCircle(x, z, 0.2);
-  }
-  pole.castShadow = true; scene.add(pole, lamp);
+    m4.makeTranslation(x, 0.09 + (i % 5) * 0.004, z).multiply(rx); sinar.setMatrixAt(i, m4);
+  });
+  pole.castShadow = true; sinar.renderOrder = 2; sinar.frustumCulled = false; scene.add(pole, lamp, sinar);
+  // satu lampu sungguhan mengikuti tiang terdekat supaya orang di bawahnya ikut terang
+  lampuDekat = new THREE.PointLight('#ffdf9a', 0, 17, 1.1); lampuDekat.position.set(0, 3.5, 0); scene.add(lampuDekat);
+}
+function updateLampu(dt, gelap) {
+  lampuSinar.opacity = gelap * 0.42;
+  if (gelap < 0.05) { lampuDekat.intensity = 0; return; }
+  let bd = 1e9, bx = 0, bz = 0;
+  for (const [x, z] of LAMPU_POS) { const d = (x - player.x) ** 2 + (z - player.z) ** 2; if (d < bd) { bd = d; bx = x; bz = z; } }
+  const k = Math.min(1, dt * 5);
+  lampuDekat.position.x += (bx - lampuDekat.position.x) * k; lampuDekat.position.z += (bz - lampuDekat.position.z) * k;
+  lampuDekat.intensity = gelap * 26 * clamp(1.6 - Math.sqrt(bd) / 12, 0, 1);
 }
 
 /* ------------------------------------------------------------------ interactables & signs */
@@ -550,9 +580,9 @@ const LANDMARK = {
 
 function papanZona(x, z, rot, teks, sub, key) {
   const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rot;
-  mesh(cyl(0.08, 0.08, 2.4, 6), '#6b4a2b', -0.9, 1.2, 0, g); mesh(cyl(0.08, 0.08, 2.4, 6), '#6b4a2b', 0.9, 1.2, 0, g);
+  mesh(cyl(0.08, 0.08, 2.5, 6), '#6b4a2b', -0.9, 1.25, -0.15, g); mesh(cyl(0.08, 0.08, 2.5, 6), '#6b4a2b', 0.9, 1.25, -0.15, g);
   const p = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.1, 0.1), [mat('#6b4a2b'), mat('#6b4a2b'), mat('#6b4a2b'), mat('#6b4a2b'),
-    new THREE.MeshLambertMaterial({ map: textTex([teks, sub || ''], { w: 512, h: 240, size: 70, size2: 38 }) }), new THREE.MeshLambertMaterial({ map: textTex([teks, sub || ''], { w: 512, h: 240, size: 70, size2: 38 }) })]);
+    new THREE.MeshLambertMaterial({ map: textTex(sub ? [teks, sub] : [teks], { w: 512, h: 240, size: sub ? 70 : 96, size2: 38 }) }), mat('#6b4a2b')]);
   p.position.y = 2; p.castShadow = true; g.add(p);
   scene.add(g); addCircle(x, z, 0.9);
   addInteract(g, 'papan', key, 6);
@@ -1113,8 +1143,8 @@ const GEROBAK = (D.jajanTaman || [
   { nama: 'Burger', emoji: '🍔', harga: 20000, warna: '#f29b4b' },
   { nama: 'Es Krim', emoji: '🍦', harga: 10000, warna: '#5aa7dc' },
   { nama: 'Minuman', emoji: '🥤', harga: 8000, warna: '#6aa64e' }
-]).map((J, i) => {
-  const [x, z, yaw] = [[-15.3, 91.5, Math.PI / 2], [-15.3, 95.2, Math.PI / 2], [-15.3, 98.9, Math.PI / 2], [-3.4, 98.2, -Math.PI / 2]][i % 4];
+]).map((J, i) => buatGerobak(J, ...[[-15.3, 91.5, Math.PI / 2], [-15.3, 95.2, Math.PI / 2], [-15.3, 98.9, Math.PI / 2], [-3.4, 98.2, -Math.PI / 2]][i % 4]));
+function buatGerobak(J, x, z, yaw) {
   const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = yaw; scene.add(g);
   mesh(box(1.9, 0.9, 1.0), '#fffaf0', 0, 0.75, 0, g); mesh(box(2.0, 0.08, 1.1), J.warna, 0, 1.22, 0, g, false);
   for (const sx of [-0.7, 0.7]) { const r = mesh(cyl(0.3, 0.3, 0.08, 10), '#333333', sx, 0.3, 0.5, g, false); r.rotation.x = Math.PI / 2; }
@@ -1128,11 +1158,31 @@ const GEROBAK = (D.jajanTaman || [
   addCircle(x, z, 1.15);
   const it = addInteract(g, 'gerobak', J, 3.6); it.label = `${J.emoji} Beli ${J.nama}`;
   J.g = g; return J;
-});
+}
+// jajanan di pinggir jalan (di luar food court) dan mesin minuman dingin
+for (const [J, x, z, yaw] of [
+  [{ nama: 'Gulali', emoji: '🍭', harga: 8000, warna: '#e98bb8' }, 8.6, -6, Math.PI / 2],
+  [{ nama: 'Jagung Bakar', emoji: '🌽', harga: 10000, warna: '#e3b23c' }, 15.3, -74, -Math.PI / 2],
+  [{ nama: 'Es Krim', emoji: '🍦', harga: 10000, warna: '#5aa7dc' }, -0.6, -128, Math.PI / 2],
+  [{ nama: 'Gulali', emoji: '🍭', harga: 8000, warna: '#e98bb8' }, 36.5, 66, -Math.PI / 2]
+]) { const q = { x, z }; resolve(q, 1.3); buatGerobak(J, q.x, q.z, yaw); }
+for (const [x, z, yaw] of [[14.5, 36.5, Math.PI / 2], [7.6, -168, -Math.PI / 2], [36.4, 83, -Math.PI / 2], [19.5, -38, -Math.PI / 2], [-21, 56.5, 0], [45, 26, -Math.PI / 2]]) {
+  const J = { nama: 'Minuman Dingin', emoji: '🥤', harga: D.hargaMesinMinuman || 5000, mesin: true };
+  const q = { x, z }; resolve(q, 0.9);
+  const g = new THREE.Group(); g.position.set(q.x, 0, q.z); g.rotation.y = yaw; scene.add(g);
+  mesh(box(1.0, 1.9, 0.75), '#c23b3b', 0, 0.95, 0, g);
+  const dp = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 1.5), new THREE.MeshLambertMaterial({ emissive: '#555', map: tex(172, 300, (c, w, h) => {
+    c.fillStyle = '#e9f4f8'; c.fillRect(0, 0, w, h); const wr = ['#e8483f', '#f2b632', '#3fa35b', '#3f7fd0', '#8a4fc0'];
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 5; k++) { c.fillStyle = wr[(r + k) % 5]; c.fillRect(10 + k * 31, 12 + r * 52, 22, 40); c.fillStyle = '#ffffff'; c.fillRect(10 + k * 31, 24 + r * 52, 22, 8); }
+    c.fillStyle = '#26302a'; c.fillRect(0, 222, w, 78); c.fillStyle = '#fff'; c.font = '600 26px Fredoka, sans-serif'; c.textAlign = 'center'; c.fillText('🥤 ' + fmtRpAwal(J.harga), w / 2, 258); c.fillStyle = '#111'; c.fillRect(40, 272, 92, 20);
+  }) }));
+  dp.position.set(0, 1.05, 0.381); g.add(dp);
+  addCircle(q.x, q.z, 0.75);
+  const it = addInteract(g, 'gerobak', J, 3); it.label = '🥤 Beli minuman dingin'; J.g = g;
+}
 for (const [x, z, yaw] of [[-3.3, 91, Math.PI / 2], [-3.3, 94.2, Math.PI / 2], [-12.2, 110.2, 0], [-9, 110.2, 0], [-5.8, 110.2, 0], [23.3, 87.9, 0]]) buatBangku(x, z, yaw);
 function bukaGerobak(J) {
-  if (!TIKET_TB.punya && dalamTB(J.g.position.x, J.g.position.z)) { hint('Beli tiket terusan dulu di loket ya 🎟️'); return; }
-  kartu(J.emoji, J.nama, `<p style="text-align:center">${fmtRp(J.harga)} per porsi.<br>Beli dua, satu untukmu dan satu untuk dia: <b>${fmtRp(J.harga * 2)}</b></p><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)}</div>`, 'Beli', () => {
+  kartu(J.emoji, J.mesin ? 'Mesin Minuman' : J.nama, `<p style="text-align:center">${fmtRp(J.harga)} per ${J.mesin ? 'kaleng' : 'porsi'}.<br>Beli dua, satu untukmu dan satu untuk dia: <b>${fmtRp(J.harga * 2)}</b></p><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)}</div>`, 'Beli', () => {
     if (!bayar(J.harga * 2)) { hint(`Uangnya nggak cukup untuk ${J.nama}.`, 3500); return; }
     hint(`${J.emoji} ${J.nama} untuk berdua. Selamat menikmati!`, 3500);
     tmpB.set(player.x, 1.9, player.z); hearts(tmpB, 6, J.emoji);
@@ -1768,6 +1818,7 @@ function updateWaktu(dt, dalam) {
   BULAN.position.set(player.x - dx * 500, 260, player.z - 300); BULAN.material.opacity = clamp(1 - w.terang * 2, 0, 1);
   // lampu taman menyala saat gelap
   lampuMat.emissive.setScalar(0).lerp(tmpCol.set('#ffe9a8'), clamp(1.2 - w.terang * 1.6, 0.15, 1));
+  updateLampu(dt || 0.016, dalam ? 0 : clamp(1.15 - w.terang * 2.2, 0, 1));
   for (const m of lampuGedung) m.emissiveIntensity = clamp(1.2 - w.terang, 0.2, 1);
   // cahaya: di dalam gedung tetap terang karena lampu
   const gelapBios = dalam && dalam.id === 'bioskop' ? (BIOS.status === 'putar' ? 1 : 0.35) : 0;
@@ -2870,7 +2921,7 @@ const ZONES = [
   { id: 'jalan', nama: 'Jalan Utama', x: 14, z: -40, r: 400 }
 ];
 const SPES_ZONA = { flamingo: 'flamingo', gajah: 'gajah', singa: 'singa', unta: 'unta', bison: 'bison', jerapah: 'jerapah', zebra: 'zebra', babyzoo: 'kelinci', burung: 'makaw', harimau: 'harimau', beruang: 'beruang', panda: 'panda' };
-for (const z of ZONES) if (z.sign) { const sp = INFO[SPES_ZONA[z.id]]; papanZona(z.sign[0], z.sign[1], z.sign[2], z.nama.replace('Zona ', ''), sp ? sp.emoji + ' ' + (z.id === 'babyzoo' ? 'kelinci' : '') : '', z.id); }
+for (const z of ZONES) if (z.sign) { const sp = INFO[SPES_ZONA[z.id]]; papanZona(z.sign[0], z.sign[1], z.sign[2], (z.id === 'burung' ? 'BURUNG' : sp ? sp.nama : z.nama).toUpperCase(), '', z.id); }
 papanZona(25.25, 77.5, Math.PI / 2, 'Peta Taman', 'Ketuk untuk lihat', 'peta');
 addInteract(airTerjunMesh, 'landmark', 'airterjun', 22);
 
