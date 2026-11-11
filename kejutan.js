@@ -2,13 +2,13 @@
 window.KEJUTAN = {
   "kelinci": {
     "judul": "Surat dari Kelinci 🐰",
-    "isi": "Hai! Aku kelinci kecil di sini. Ada yang titip pesan: kamu itu orang paling spesial hari ini. Terima kasih sudah datang 💛"
+    "isi": "Jangan lupa bahagia, jangan lupa istirahat, dan jangan lupa kamu tidak sendirian. Semangat, ya! Masih banyak hal indah menunggumu! 🌸💛"
   },
   "gajah": {
     "judul": "Surat dari Gajah 🐘",
-    "isi": "Maaf suratnya kena lumpur sedikit, tadi aku main di kubangan. Isinya tetap sama: kamu disayang banget! 💌"
+    "isi": "Gajah tidak pernah lupa, begitu juga seseorang yang selalu ingat kamu setiap hari. Langkahmu boleh pelan, asal terus maju. Kamu kuat! 🐘"
   },
-  "jerapah": "Bunga ini dari jerapah. Katanya, kamu cantik sekali hari ini 🌸",
+  "jerapah": "Leherku panjang supaya bisa melihat jauh ke depan, dan di sana aku melihat hari-hari indah untukmu. Jangan menyerah, ya 🦒💕",
   "kunang": "I ❤ U",
   "ultah": {
     "aktif": true,
