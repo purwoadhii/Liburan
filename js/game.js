@@ -3198,8 +3198,9 @@ function mulaiSuap() {
   const pakan = stok[0][0]; STOK[A.kind + '|' + pakan]--;
   wortel.children[0].material.color.set(WARNA_PAKAN(pakan));
   A.state = 'feed'; A.target = [tx, tz]; A.timer = 14;
-  wortel.visible = true; wortel.scale.setScalar(A.kind === 'kelinci' ? 0.8 : 1.4);
+  wortel.visible = true; wortel.scale.setScalar(A.kind === 'kelinci' ? 1.3 : 1.4);
   AMATI.suap = { A, dimakan: false, t: 0, pakan };
+  if (A.kind === 'kelinci') mulaiSine(A, 'suap');
   bicara(A.kind === 'kelinci' ? 'Sodorkan pelan-pelan, biar kelincinya nggak takut.' : 'Pegang wortelnya yang kuat ya.', 4);
   hint(`${INFO[A.kind].nama} datang mendekat… 🥕`);
 }
@@ -3215,7 +3216,7 @@ function updateAmati(dt) {
     kamu.arms[1].hand.getWorldPosition(tmpB);
     const jauh = Math.hypot(tmpB.x - cx, tmpB.z - cz);
     if (jauh < 14) S.dekat = true;
-    if (A.state === 'eat') { S.dimakan = true; wortel.scale.setScalar(Math.max(0.05, A.timer / 5) * (A.kind === 'kelinci' ? 0.8 : 1.4)); }
+    if (A.state === 'eat') { S.dimakan = true; wortel.scale.setScalar(Math.max(0.05, A.timer / 5) * (A.kind === 'kelinci' ? 1.3 : 1.4)); }
     else if (A.state === 'idle' && S.t > 0.5) {
       wortel.visible = false; AMATI.suap = null;
       if (S.dimakan && !kejutanSetelahMakan(A)) setTimeout(() => bicara(A.kind === 'kelinci' ? 'Lihat, kelincinya habis makan wortel. Gemas!' : 'Dia suka banget sama wortelnya.', 4), 400);
@@ -3695,7 +3696,7 @@ function update(dt, t) {
   if (keys.KeyW || keys.ArrowUp) jy = 1; if (keys.KeyS || keys.ArrowDown) jy = -1;
   if (keys.KeyA || keys.ArrowLeft) jx = -1; if (keys.KeyD || keys.ArrowRight) jx = 1;
   let mag = Math.min(1, Math.hypot(jx, jy));
-  if (paused || !started || duduk || antriPemain || TOPI.anim || AMATI.aktif || USIR.dorong || AUTO || (LAMAR && LAMAR.kunci)) { jx = jy = 0; mag = 0; }
+  if (paused || !started || duduk || antriPemain || TOPI.anim || AMATI.aktif || USIR.dorong || AUTO || SINE || (LAMAR && LAMAR.kunci)) { jx = jy = 0; mag = 0; }
   // kiri-kanan = berbelok (memutar arah), maju-mundur = jalan
   const belok = Math.abs(jx) < 0.12 ? 0 : jx;
   camYaw -= belok * 2.1 * dt;
@@ -4007,10 +4008,107 @@ function mulaiTitip(dari, A) {
   gelKamu.textContent = 'Aku titipkan suratku juga ya 💌'; gelKamu.classList.remove('sembunyi'); kamuBicaraT = 4;
   const amplop = buatAmplop(false); amplop.scale.setScalar(0.6); amplop.rotation.x = 1.2; kamu.arms[1].hand.add(amplop);
   hadapkanKe(A.group.position.x, A.group.position.z); if (mode === 'fpp') camPitch = 0.1;
-  const dekat = dari === 'kelinci' ? kakiDepan(0.7) : clampIn(A.encl, player.x, player.z, dari === 'gajah' ? 1.6 : 1.4);
+  const lama = SURAT.find(q => q.obj.userData.inter && q.obj.userData.inter.data.dari === dari);
+  if (dari === 'kelinci') {
+    // surat balasan ditaruh di tempat surat kelinci tadi; kelinci datang mengambilnya
+    const titik = lama ? [lama.obj.position.x, lama.obj.position.z] : kakiDepan(0.6);
+    { const d = Math.hypot(titik[0] - player.x, titik[1] - player.z) || 1, k = clamp(d, 0.95, 1.1) / d; titik[0] = player.x + (titik[0] - player.x) * k; titik[1] = player.z + (titik[1] - player.z) * k; }
+    hadapkanKe(titik[0], titik[1]);
+    A.state = 'kejutan'; A.kej = { jenis: 'titip', dari, fase: 0, t: 0, amplop, titik, lama }; KEJ.aktif = A;
+    mulaiSine(A, 'titip'); SINE.lihat.set(titik[0], 0.05, titik[1]);
+    return;
+  }
+  if (lama) buangSurat(lama);
+  const dekat = clampIn(A.encl, player.x, player.z, dari === 'gajah' ? 1.6 : 1.4);
   A.state = 'kejutan'; A.kej = { jenis: 'titip', dari, fase: 0, t: 0, amplop, dekat }; KEJ.aktif = A;
+  mulaiSine(A, 'kunci');
+}
+function buangSurat(q) {
+  scene.remove(q.obj); const ix = interactables.findIndex(x => x.obj === q.obj); if (ix >= 0) interactables.splice(ix, 1);
+  const i = SURAT.indexOf(q); if (i >= 0) SURAT.splice(i, 1);
+}
+function updateTitipKelinci(A, K, dt, ke) {
+  const S = SINE, [tx, tz] = K.titik;
+  if (K.fase === 0) {                                   // jongkok, tangan menaruh surat di tanah
+    if (S) { S.lengan = tmpB.set(tx, 0.12, tz).clone(); S.lihat.set(tx, 0.05, tz); }
+    if (K.t > 1.3 && !K.ditaruh) {
+      K.ditaruh = true; if (K.lama) buangSurat(K.lama);
+      scene.attach(K.amplop); K.amplop.position.set(tx, 0.03, tz); K.amplop.rotation.set(0, rand(-0.5, 0.5), 0); K.amplop.scale.setScalar(1);
+      hearts(K.amplop.position.clone().setY(0.2), 3, '💌');
+    }
+    if (K.t > 2.1) { K.fase = 1; K.t = 0; if (S) S.lengan = null; bicara('Lihat, kelincinya datang lagi!', 3.5); }
+  }
+  else if (K.fase === 1) {                              // kelinci datang mengambil
+    if (S) S.lihat.lerp(tmpB.set(A.group.position.x, 0.2, A.group.position.z), Math.min(1, dt * 3));
+    if (ke(tx, tz + (A.group.position.z > tz ? 0.3 : -0.3), 2) || K.t > 14) { K.fase = 2; K.t = 0; }
+  }
+  else if (K.fase === 2) {                              // menunduk, menggigit surat
+    A.graze = Math.min(1, K.t * 2);
+    if (K.t > 0.8 && !K.digigit) { K.digigit = true; A.head.attach(K.amplop); K.amplop.position.set(0, -0.05, 0.16); K.amplop.rotation.set(1.2, 0, 0); K.amplop.scale.setScalar(0.55); A.head.getWorldPosition(tmpB); hearts(tmpB, 4, '💌'); bicara('Kelincinya mengambil suratmu! 🐰', 4); }
+    if (K.t > 1.6) { A.graze = 0; K.fase = 3; K.t = 0; }
+  }
+  else if (K.fase === 3) {                              // membawa surat ke rumahnya
+    if (S) S.lihat.lerp(tmpB.set(A.group.position.x, 0.2, A.group.position.z), Math.min(1, dt * 4));
+    if (ke(RUMAH_KELINCI.pintu[0], RUMAH_KELINCI.pintu[1], 2.2) || K.t > 14) {
+      A.sembunyi = true; A.group.visible = false; K.amplop.parent && K.amplop.parent.remove(K.amplop);
+      K.fase = 4; K.t = 0; hint('Kelinci membawa suratmu masuk ke rumahnya 💌', 4000);
+      if (S) { S.cam = 'tiga'; S.jt = 0; S.potong = true; }
+      setTimeout(() => bicara('Suratmu pasti sampai. Aku jadi penasaran isinya 😊', 4), 1200);
+    }
+  }
+  else if (K.fase === 4 && K.t > 2.8) { akhiriSine(); K.fase = 5; K.t = 0; }
+  else if (K.fase === 5 && K.t > 1.5) {
+    A.sembunyi = false; A.group.visible = true; A.group.position.set(RUMAH_KELINCI.pintu[0], 0, RUMAH_KELINCI.pintu[1] - 0.2); A.yaw = Math.PI;
+    K.fase = 6; K.t = 0; K.pulang = clampIn(A.encl, A.group.position.x, A.group.position.z, 2);
+  }
+  else if (K.fase === 6) { if (ke(K.pulang[0], K.pulang[1], 2) || K.t > 6) selesaiKejutan(A); }
+}
+// ---- sinematik: pemain dikunci, si cewek jongkok, kamera dari matanya lalu pindah ke orang ketiga saat ia berdiri ----
+var SINE = null;
+function mulaiSine(A, jenis) {
+  SINE = { A, jenis, fase: 0, t: 0, j: 0, jt: jenis === 'kunci' ? 0 : 1, cam: jenis === 'kunci' ? null : 'mata', lihat: new THREE.Vector3(A.group.position.x, 0.2, A.group.position.z), camP: new THREE.Vector3(), camL: new THREE.Vector3(), potong: true, tunggu: 0 };
+  if (jenis !== 'kunci') $('amati').classList.add('sembunyi');
+}
+function akhiriSine() {
+  if (!SINE) return;
+  for (const h of kamu.headParts) h.visible = true;
+  if (AMATI.aktif) $('amati').classList.remove('sembunyi');
+  SINE = null;
+}
+function updateSine(dt) {
+  const S = SINE; if (!S) return;
+  const A = S.A, K = A.kej; S.t += dt;
+  if (S.jenis === 'kunci') { if (!K) akhiriSine(); return; }
+  if (S.jenis === 'suap') {
+    if (S.fase === 0) {                                 // kelinci makan dari tangan
+      A.head.getWorldPosition(tmpB); S.lihat.lerp(tmpB, Math.min(1, dt * 4)); S.lengan = tmpB.clone();
+      if (K && (K.jenis === 'kelinci' || K.jenis === 'pulang')) { S.fase = 1; S.lengan = null; }
+      else if (!AMATI.suap && !K) { S.tunggu += dt; if (S.tunggu > 1.8) { akhiriSine(); return; } }
+    } else if (S.fase === 1) {                          // memandangi kelinci pulang ke rumahnya
+      S.lihat.lerp(tmpB.set(A.group.position.x, 0.25, A.group.position.z), Math.min(1, dt * 4));
+      if (!K) { akhiriSine(); return; }
+      if (K.fase >= 2) { S.fase = 2; S.t = 0; S.cam = 'tiga'; S.jt = 0; S.potong = true; }
+    } else if (S.fase === 2) { if (S.t > 2.8) { S.fase = 3; S.cam = null; for (const h of kamu.headParts) h.visible = true; } }
+    else if (!K || K.jenis === 'pulang' || K.fase >= 5) { akhiriSine(); return; }
+  }
+  // jongkok
+  S.j += (S.jt - S.j) * Math.min(1, dt * 3);
+  if (S.j > 0.01) {
+    kamu.group.position.y -= 0.5 * S.j; for (const l of kamu.legs) l.rotation.x = lerp(l.rotation.x, -1.1, S.j);
+    if (S.lengan) aimArm(kamu, kamu.arms[1], S.lengan);
+  }
+  // kamera
+  const f = [-Math.sin(player.yaw), -Math.cos(player.yaw)], r = [Math.cos(player.yaw), -Math.sin(player.yaw)];
+  for (const h of kamu.headParts) h.visible = S.cam !== 'mata';
+  if (S.cam === 'mata') { tmpA.set(player.x + f[0] * 0.3, 1.47 - 0.5 * S.j, player.z + f[1] * 0.3); tmpC.copy(S.lihat); }
+  else if (S.cam === 'tiga') { const mx = (player.x + partner.x) / 2, mz = (player.z + partner.z) / 2; tmpA.set(mx + f[0] * 3.3 + r[0] * 1.3, 1.5, mz + f[1] * 3.3 + r[1] * 1.3); tmpC.set(mx, 0.95, mz); }
+  else return;
+  const k = S.potong ? 1 : Math.min(1, dt * 5); S.potong = false;
+  S.camP.lerp(tmpA, k); S.camL.lerp(tmpC, k);
+  camera.position.copy(S.camP); camera.lookAt(S.camL); camera.updateMatrixWorld();
 }
 function updateTitip(A, K, dt, ke) {
+  if (K.dari === 'kelinci') { updateTitipKelinci(A, K, dt, ke); return; }
   const hadap = () => { const want = Math.atan2(player.x - A.group.position.x, player.z - A.group.position.z); A.yaw += angDiff(A.yaw, want) * Math.min(1, dt * 4); };
   if (K.fase === 0) { if (ke(K.dekat[0], K.dekat[1], K.dari === 'kelinci' ? 2 : 1.3) || K.t > 12) { K.fase = 1; K.t = 0; } }
   else if (K.fase === 1) {
@@ -4116,7 +4214,7 @@ function updateSemprot(dt) {
 function hadapkanKe(x, z) { const want = Math.atan2(-(x - player.x), -(z - player.z)); camYaw = player.yaw = want; }
 function kejutanSetelahMakan(A) {
   if (KEJ.aktif) return false;
-  if (A.kind === 'kelinci' && !KEJ.kelinci) { KEJ.kelinci = true; mulaiKejutan(A, 'kelinci'); return true; }
+  if (A.kind === 'kelinci') { if (!KEJ.kelinci) { KEJ.kelinci = true; mulaiKejutan(A, 'kelinci'); } else mulaiKejutan(A, 'pulang'); return true; }
   if (A.kind === 'gajah' && A === GAJAH_SURAT && !KEJ.gajah) { KEJ.gajah = true; mulaiKejutan(A, 'gajahSurat'); return true; }
   if (A.kind === 'gajah') { mulaiKejutan(A, 'semprot'); return true; }
   if (A.kind === 'jerapah' && !KEJ.jerapah) { KEJ.jerapah = true; mulaiKejutan(A, 'bunga'); return true; }
@@ -4127,7 +4225,8 @@ function mulaiKejutan(A, jenis) {
     if (AMATI.aktif) selesaiAmati();
     hadapkanKe(A.group.position.x, A.group.position.z); if (mode === 'fpp') camPitch = 0.15;
     A.state = 'kejutan'; A.kej = { jenis, fase: 0, t: 0 }; KEJ.aktif = A;
-    if (jenis === 'kelinci') { A.kej.target = RUMAH_KELINCI.pintu; setTimeout(() => bicara('Eh, kelincinya lari ke rumahnya. Mau ngapain ya?', 4), 600); }
+    if (jenis === 'pulang') { A.kej.target = RUMAH_KELINCI.pintu; setTimeout(() => bicara('Kenyang ya? Dia pulang ke rumahnya 🐰', 4), 600); }
+    else if (jenis === 'kelinci') { A.kej.target = RUMAH_KELINCI.pintu; setTimeout(() => bicara('Eh, kelincinya lari ke rumahnya. Mau ngapain ya?', 4), 600); }
     else if (jenis === 'gajahSurat') { A.kej.target = [LUMPUR.x + 1.5, LUMPUR.z]; setTimeout(() => bicara('Gajahnya jalan ke kubangan lumpur. Lihat deh!', 4), 600); }
     else if (jenis === 'semprot') { A.kej.target = null; setTimeout(() => bicara('Awas, gajahnya mau menyemprot air!', 3), 300); }
     else if (jenis === 'bunga') { A.kej.target = clampIn(A.encl, player.x, player.z, 1.4); setTimeout(() => bicara('Jerapahnya balik lagi. Kayaknya mau kasih sesuatu.', 4), 600); }
@@ -4160,6 +4259,11 @@ function updateKejutanHewan(A, dt, t) {
       if (K.t > 0.7) { taruhSurat(K.surat, K.akhir[0], K.akhir[1], { judul: KJT(KJ.kelinci, 'judul', 'Surat dari Kelinci 🐰'), isi: KJT(KJ.kelinci, 'isi', 'Hai! Ada yang titip pesan buat kamu: kamu orang paling spesial hari ini 💛'), lumpur: false, dari: 'kelinci', A }); K.fase = 5; K.t = 0; hint('Kelinci menaruh surat di depan kakimu. Ketuk suratnya 💌', 5000); if (mode === 'fpp') camPitch = 0.5; }
     }
     else if (K.fase === 5) { A.graze = Math.max(0, 1 - K.t * 2); const [bx, bz] = clampIn(A.encl, A.group.position.x, A.group.position.z, 2); if (ke(bx, bz, 2) || K.t > 6) selesaiKejutan(A); }
+  } else if (K.jenis === 'pulang') {
+    if (K.fase === 0 && (ke(K.target[0], K.target[1], 2.2) || K.t > 14)) { K.fase = 1; K.t = 0; }
+    else if (K.fase === 1) { gerak = true; if (ke(RUMAH_KELINCI.x, RUMAH_KELINCI.z + 0.4, 1.2) || K.t > 1) { A.sembunyi = true; A.group.visible = false; K.fase = 2; K.t = 0; } }
+    else if (K.fase === 2 && K.t > 5) { A.sembunyi = false; A.group.visible = true; A.group.position.set(RUMAH_KELINCI.pintu[0], 0, RUMAH_KELINCI.pintu[1] - 0.2); A.yaw = Math.PI; K.fase = 3; K.t = 0; K.pulang = clampIn(A.encl, A.group.position.x, A.group.position.z, 2); }
+    else if (K.fase === 3) { if (ke(K.pulang[0], K.pulang[1], 2) || K.t > 6) selesaiKejutan(A); }
   } else if (K.jenis === 'gajahSurat') {
     if (K.fase === 0 && ke(K.target[0], K.target[1], 1.4)) { K.fase = 1; K.t = 0; }
     else if (K.fase === 1) {
@@ -5124,8 +5228,8 @@ function bukaInfo(papan) {
 }
 
 var kejSiap = false;
-function updateKejutan(dt, t) { if (!kejSiap) return; updateSemprot(dt); updateSurat(dt); updateKunang(dt, t); updateKue(dt, t); }
+function updateKejutan(dt, t) { if (!kejSiap) return; updateSine(dt); updateSemprot(dt); updateSurat(dt); updateKunang(dt, t); updateKue(dt, t); }
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { mulaiSuap, get SINE() { return SINE; }, HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
