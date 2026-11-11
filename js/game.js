@@ -347,6 +347,8 @@ enclosureRect('panda', -55, -186, 26, 20, { tanah: '#cfe5a6' });
 // pagar keliling taman: hanya bisa masuk lewat gerbang
 fencePath([[-2, 90], [-2, 100], [BATAS.x1 + 1, 100], [BATAS.x1 + 1, BATAS.z1 + 1], [BATAS.x2 - 1, BATAS.z1 + 1], [BATAS.x2 - 1, 90], [37.4, 90]], [], 'tinggi');
 fencePath([[-2, 90], [22.6, 90]], [], 'tinggi');
+// pagar taman bermain: masuk hanya lewat gapura (x 24.9, z 67.4–72.6) setelah beli tiket terusan di loket
+fencePath([[24.9, 67.4], [24.9, 55.3], [7, 55.3], [1.3, 60.5], [1.3, 66.5], [-12.6, 66.5], [-12.6, 88.8], [24.9, 88.8], [24.9, 72.6]]);
 // pagar area air terjun, gerbang di ujung jalan utama (x=0, z=-188)
 fencePath([[-4.5, -188], [-36, -188], [-36, -226]], [], 'kayu');
 fencePath([[4.5, -188], [36, -188], [36, -226]], [], 'kayu');
@@ -418,7 +420,7 @@ let airTerjunMesh;
 /* ------------------------------------------------------------------ trees */
 const treeData = [];
 function farFromRoad(x, z, m) { for (const p of roadPts) { if (Math.abs(p.x - x) > 12 || Math.abs(p.z - z) > 12) continue; if (Math.hypot(p.x - x, p.z - z) < p.w + m) return false; } return true; }
-const AREA_BEBAS = [[13, 71.5, 19], [76, -50, 14], [60, -48, 5], [50, 68, 16], [75, 68, 17], [62, 84, 12], [40, 80, 8], [30, 116, 36], [30, 90, 12], [55, -20, 22], [-80, -135, 16], [0, -208, 15], [-28, -150, 6]];
+const AREA_BEBAS = [[13, 71.5, 19], [-5, 77, 14], [76, -50, 14], [60, -48, 5], [50, 68, 16], [75, 68, 17], [62, 84, 12], [40, 80, 8], [30, 116, 36], [30, 90, 12], [55, -20, 22], [-80, -135, 16], [0, -208, 15], [-28, -150, 6]];
 function bebasArea(x, z) { for (const [ax, az, r] of AREA_BEBAS) if (Math.hypot(x - ax, z - az) < r) return false; return true; }
 function bolehPohon(x, z) {
   if (!farFromRoad(x, z, 3)) return false;
@@ -749,6 +751,10 @@ const WAHANA = {};
   const tPaving2 = tex(128, 128, (c, w, h) => { for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { c.fillStyle = (x + y) % 2 ? '#f3d9e4' : '#f8eadf'; c.fillRect(x * 32, y * 32, 32, 32); } }, [11, 16]);
   const lt = new THREE.Mesh(new THREE.PlaneGeometry(TB.x2 - TB.x1, TB.z2 - TB.z1), new THREE.MeshLambertMaterial({ map: tPaving2, polygonOffset: true, polygonOffsetFactor: -2 }));
   lt.rotation.x = -Math.PI / 2; lt.position.set((TB.x1 + TB.x2) / 2, 0.04, (TB.z1 + TB.z2) / 2); lt.receiveShadow = true; scene.add(lt);
+  // area baru di sisi barat (ontang-anting & putaran roller coaster)
+  const tP3 = tPaving2.clone(); tP3.wrapS = tP3.wrapT = THREE.RepeatWrapping; tP3.repeat.set(7, 10.5); tP3.needsUpdate = true;
+  const lt2 = new THREE.Mesh(new THREE.PlaneGeometry(14.4, 21.8), new THREE.MeshLambertMaterial({ map: tP3, polygonOffset: true, polygonOffsetFactor: -2 }));
+  lt2.rotation.x = -Math.PI / 2; lt2.position.set(-5.2, 0.04, 77.6); lt2.receiveShadow = true; scene.add(lt2);
   // gapura masuk dari jalan utama
   const gp = new THREE.Group(); gp.position.set(25.2, 0, 70); gp.rotation.y = Math.PI / 2; scene.add(gp);
   for (const sx of [-2.6, 2.6]) { mesh(cyl(0.22, 0.26, 4.6, 8), '#e8836f', sx, 2.3, 0, gp); mesh(sph(0.36, 8, 6), '#f2d14b', sx, 4.75, 0, gp); }
@@ -870,25 +876,73 @@ const _q = new THREE.Quaternion();
   W.teriak = () => { const f = W.fase(); return f > 22.2 && f < 22.6; };
 }
 
+// ---- ontang-anting (kursi gantung berputar) ----
+{
+  const W = WAHANA.ontang = { id: 'ontang', nama: 'Ontang-Anting', emoji: '🎪', x: -4, z: 78 };
+  const g = new THREE.Group(); g.position.set(W.x, 0, W.z); scene.add(g);
+  mesh(cyl(2.2, 2.5, 0.4, 16), '#9aa3ad', 0, 0.2, 0, g);
+  mesh(cyl(0.45, 0.6, 9.4, 10), '#d64579', 0, 4.9, 0, g);
+  for (let i = 0; i < 4; i++) mesh(cyl(0.5, 0.5, 0.25, 10), i % 2 ? '#ffffff' : '#f2d14b', 0, 1.6 + i * 2.2, 0, g, false);
+  mesh(sph(0.6, 10, 8), '#f2d14b', 0, 9.9, 0, g);
+  const atas = new THREE.Group(); atas.position.y = 4.6; g.add(atas);
+  mesh(cyl(3.0, 3.0, 0.5, 20), '#f2d14b', 0, 0, 0, atas);
+  mesh(cone(3.3, 1.5, 20), '#e8836f', 0, 1.0, 0, atas);
+  for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; mesh(sph(0.14, 6, 5), i % 2 ? '#ffffff' : '#5aa7dc', Math.cos(a) * 3.02, -0.05, Math.sin(a) * 3.02, atas, false); }
+  const L = 3.6; W.kursiList = []; W.ayun = [];
+  const warnaK = ['#d64579', '#5aa7dc', '#6aa64e', '#f29b4b'];
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * Math.PI * 2;
+    const pv = new THREE.Group(); pv.position.set(Math.cos(a) * 2.6, -0.25, Math.sin(a) * 2.6); pv.rotation.y = -a; atas.add(pv);
+    const ay = new THREE.Group(); pv.add(ay);
+    for (const sz of [-0.22, 0.22]) mesh(box(0.03, L, 0.03), '#777777', 0, -L / 2, sz, ay, false);
+    const s = new THREE.Group(); s.position.y = -L; ay.add(s);
+    mesh(box(0.5, 0.08, 0.5), warnaK[i % 4], 0, 0, 0, s, false); mesh(box(0.5, 0.5, 0.06), warnaK[i % 4], 0, 0.28, -0.25, s, false);
+    W.kursiList.push(s); W.ayun.push(ay);
+  }
+  W.siklus = 64;
+  W.fase = () => (performance.now() / 1000) % W.siklus;
+  // 0 = diam (naik/turun penumpang), 1 = putaran penuh
+  W.putarF = (f) => { const u = f < 8 ? 0 : f < 16 ? (f - 8) / 8 : f < 46 ? 1 : f < 55 ? 1 - (f - 46) / 9 : 0; return u * u * (3 - 2 * u); };
+  putar.push((dt, t) => {
+    const sp = W.putarF(W.fase());
+    atas.position.y = lerp(4.6, 8.4, sp); atas.rotation.y -= dt * 1.15 * sp;
+    W.ayun.forEach((ay, i) => ay.rotation.z = 0.6 * sp + Math.sin(t * 1.7 + i) * 0.03 * sp);
+  });
+  addCircle(W.x, W.z, 3.1);
+  W.pintu = [W.x + 4.3, W.z + 0.4];
+  W.bisaNaik = () => { const f = W.fase(); return f < 6 || f > 57; };
+  W.naik = () => { W.sudahNaik = false; };
+  W.kursi = (out) => {
+    for (const [k, i] of [['a', 0], ['b', 1]]) { const s = W.kursiList[i]; s.updateWorldMatrix(true, false); tmpC.set(0, 0.1, 0); s.localToWorld(tmpC); out[k] = [tmpC.x, tmpC.z, tmpC.y]; }
+    W.kursiList[0].getWorldQuaternion(_q); tmpC.set(0, 0, 1).applyQuaternion(_q); out.yaw = Math.atan2(tmpC.x, tmpC.z) - Math.PI;
+  };
+  W.selesai = () => { const f = W.fase(); if (f > 16 && f < 46) W.sudahNaik = true; return W.sudahNaik && f > 56; };
+  W.durasi = 'sekitar setengah menit berputar';
+  W.teriak = () => { const f = W.fase(); return f > 17 && f < 17.5; };
+}
+
 // ---- roller coaster ----
 {
   const W = WAHANA.roller = { id: 'roller', nama: 'Roller Coaster', emoji: '🎢' };
-  const titik = [[9, 1.7, 57.6], [14, 1.7, 57.6], [19, 3.8, 58.4], [22.6, 9, 61.5], [23.4, 15, 66.5], [23.2, 7.5, 72.5], [22.4, 3.6, 77], [21, 9, 83], [16, 12, 86.2], [9, 7.5, 85.8], [4, 3.8, 80.5], [2.6, 9.5, 72.5], [3, 6, 64.5], [5, 3.2, 59.4]];
+  // lintasan diperpanjang ke area baru di barat: mengitari ontang-anting lalu kembali ke stasiun
+  const titik = [[9, 1.7, 57.6], [14, 1.7, 57.6], [19, 3.8, 58.4], [22.6, 9, 61.5], [23.4, 16, 66.5], [23.2, 7.5, 72.5], [22.4, 3.6, 77], [21, 9, 83], [16, 12, 86.2], [9, 7.5, 86], [3, 4.5, 86.3], [-4, 9.5, 86.4], [-10, 6, 84], [-10.8, 11, 77], [-9.5, 5, 70.5], [-4, 7.5, 69.2], [1.5, 8.5, 68.2], [3.2, 7, 64.5], [5, 3.2, 59.4]];
   const kurva = new THREE.CatmullRomCurve3(titik.map(p => new THREE.Vector3(p[0], p[1], p[2])), true, 'catmullrom', 0.4);
   W.kurva = kurva; W.L = kurva.getLength();
   // rel: 2 pipa + bantalan + tiang
-  const N = 360, rel = [[], []];
+  const N = 520, rel = [[], []];
   for (let i = 0; i <= N; i++) {
     const u = i / N, p = kurva.getPointAt(u % 1), tg = kurva.getTangentAt(u % 1);
     const sx = -tg.z, sz = tg.x, l = Math.hypot(sx, sz) || 1;
     rel[0].push(new THREE.Vector3(p.x + sx / l * 0.45, p.y, p.z + sz / l * 0.45)); rel[1].push(new THREE.Vector3(p.x - sx / l * 0.45, p.y, p.z - sz / l * 0.45));
   }
-  for (const r of rel) scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(r, true), 360, 0.07, 5, true), mat('#d64545')));
-  const nB = 180, bantal = new THREE.InstancedMesh(box(1.1, 0.08, 0.18), mat('#555555'), nB), m4 = new THREE.Matrix4(), o3 = new THREE.Object3D();
+  for (const r of rel) scene.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(r, true), 520, 0.07, 5, true), mat('#d64545')));
+  const nB = 260, bantal = new THREE.InstancedMesh(box(1.1, 0.08, 0.18), mat('#555555'), nB), m4 = new THREE.Matrix4(), o3 = new THREE.Object3D();
   for (let i = 0; i < nB; i++) { const u = i / nB, p = kurva.getPointAt(u); o3.position.copy(p).y -= 0.08; o3.lookAt(p.clone().add(kurva.getTangentAt(u))); o3.updateMatrix(); bantal.setMatrixAt(i, o3.matrix); }
   scene.add(bantal);
   const tiang = [];
-  for (let i = 0; i < 46; i++) { const p = kurva.getPointAt(i / 46); if (p.y > 2.2) tiang.push(p); }
+  // tiang tidak dipasang di depan gapura dan di dekat papan wahana, supaya tulisan tidak tertutup
+  const dekatPapan = (p) => (p.x > 20 && Math.abs(p.z - 70) < 4.2) || Object.values(WAHANA).some(w => w.pintu && Math.hypot(w.pintu[0] - p.x, w.pintu[1] - p.z) < 4.2);
+  for (let i = 0; i < 66; i++) { const p = kurva.getPointAt(i / 66); if (p.y > 2.2 && !dekatPapan(p)) tiang.push(p); }
   const tg2 = new THREE.InstancedMesh(cyl(0.12, 0.15, 1, 6), mat('#f2f2f2'), tiang.length);
   tiang.forEach((p, i) => { o3.position.set(p.x, (p.y - 0.15) / 2, p.z); o3.rotation.set(0, 0, 0); o3.scale.set(1, p.y - 0.15, 1); o3.updateMatrix(); tg2.setMatrixAt(i, o3.matrix); addCircle(p.x, p.z, 0.2); });
   scene.add(tg2);
@@ -949,22 +1003,61 @@ for (const id in WAHANA) {
   const hit = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2, 1.4), new THREE.MeshBasicMaterial({ visible: false })); o.add(hit);
   // papan loket kecil di pintu wahana
   const pl = new THREE.Group(); pl.position.set(W.pintu[0], 0, W.pintu[1]); scene.add(pl);
-  mesh(cyl(0.05, 0.05, 1.6, 5), '#555', 0, 0.8, 0, pl, false);
-  const pm = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.55), new THREE.MeshLambertMaterial({ map: textTex([W.emoji + ' ' + W.nama.toUpperCase(), fmtRpAwal(hargaWahana(id)) + '/orang'], { w: 420, h: 180, size: 44, size2: 34, bg: '#2f5d3a', border: '#f2d14b' }), side: THREE.DoubleSide }));
-  pm.position.set(0, 1.7, 0); pl.add(pm); pl.lookAt(TB.x2 + 10, 0, W.pintu[1]);
+  for (const sx of [-0.8, 0.8]) mesh(cyl(0.05, 0.05, 1.7, 5), '#555', sx, 0.85, 0, pl, false);
+  const pm = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.85), new THREE.MeshLambertMaterial({ map: textTex([W.emoji + ' ' + W.nama.toUpperCase(), 'Ketuk untuk naik'], { w: 480, h: 204, size: 50, size2: 32, bg: '#2f5d3a', border: '#f2d14b' }) }));
+  pm.position.set(0, 2.0, 0.01); pl.add(pm);
+  const pm2 = pm.clone(); pm2.position.z = -0.01; pm2.rotation.y = Math.PI; pl.add(pm2); pl.lookAt(TB.x2 + 10, 0, W.pintu[1]);
   const it = addInteract(o, 'wahana', id, 4.5); it.label = `${W.emoji} Naik ${W.nama}`;
+}
+// ---- satu loket di samping gapura: tiket terusan, sekali beli untuk semua wahana ----
+function hargaTB() { return D.tiketTamanBermain != null ? D.tiketTamanBermain : 40000; }
+var TIKET_TB = { punya: false, tanyaT: -1e9 };
+{
+  const g = new THREE.Group(); g.position.set(24.9, 0, 65.4); scene.add(g);
+  mesh(box(1.9, 2.5, 2.0), '#f8eadf', 0, 1.25, 0, g);
+  mesh(box(2.4, 0.18, 2.5), '#d64579', 0, 2.6, 0, g);
+  mesh(box(0.06, 0.9, 1.3), '#2a3340', 0.96, 1.55, 0, g, false);
+  mesh(box(0.35, 0.08, 1.5), '#8b6440', 1.1, 1.05, 0, g, false);
+  const ps = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.95), new THREE.MeshLambertMaterial({ map: textTex(['🎟️ LOKET', 'Tiket terusan ' + fmtRpAwal(hargaTB()) + '/orang'], { w: 560, h: 232, size: 64, size2: 36, bg: '#d64579', border: '#f2d14b' }), side: THREE.DoubleSide }));
+  ps.position.set(1.0, 3.3, 0); ps.rotation.y = Math.PI / 2; g.add(ps);
+  for (const sz of [-1.05, 1.05]) mesh(cyl(0.04, 0.04, 0.75, 5), '#555', 1.0, 2.95, sz, g, false);
+  addCircle(24.9, 65.4, 1.25);
+  const it = addInteract(g, 'loketTB', null, 4.5); it.label = '🎟️ Loket Taman Bermain'; it.pusat = [26.6, 65.4];
+  // papan kecil di gapura
+  const pt = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.6), new THREE.MeshLambertMaterial({ map: textTex(['Sekali beli tiket, bebas naik semua wahana'], { w: 720, h: 120, size: 38, bg: '#fffaf0', border: '#d64579', fg: '#26302a' }) }));
+  pt.position.set(25.21, 3.25, 70); pt.rotation.y = Math.PI / 2; scene.add(pt);
+  const pt2 = pt.clone(); pt2.position.x = 25.19; pt2.rotation.y = -Math.PI / 2; scene.add(pt2);
+}
+const dalamTB = (x, z) => x < 24.8 && x > -12.6 && z > 55.3 && z < 88.8;
+function cekGerbangTB() {
+  if (TIKET_TB.punya || NAIK_W || !dalamTB(player.x, player.z)) return;
+  player.x = 24.85;
+  if (paused || performance.now() - TIKET_TB.tanyaT < 4000) return;
+  TIKET_TB.tanyaT = performance.now();
+  hint('Beli tiket terusan dulu di loket, di samping gapura 🎟️', 3500);
+  setTimeout(() => bicara('Kita belum beli tiket taman bermain. Ke loket dulu yuk.', 3.5), 500);
+}
+function bukaTiketTB() {
+  const h = hargaTB(), tot = h * 2;
+  if (TIKET_TB.punya) { hint('Tiket terusan sudah dibeli. Langsung masuk dan naik wahana apa saja 🎢'); return; }
+  kartu('🎟️', 'Loket Taman Bermain', `<p style="text-align:center">Tiket terusan ${fmtRp(h)} per orang.<br>Untuk berdua: <b>${fmtRp(tot)}</b></p><div class="catatan">Sekali beli, bebas naik semua wahana: ${Object.values(WAHANA).map(w => w.emoji + ' ' + w.nama).join(', ')}.</div><div class="catatan">💰 Uang kalian: ${fmtRp(DOMPET.sisa)} · berlaku sampai kalian keluar taman</div>`, 'Bayar ' + fmtRp(tot), () => {
+    if (!bayar(tot)) { hint(`Uangnya nggak cukup. Tiket terusan ${fmtRp(h)} per orang.`, 3500); return; }
+    TIKET_TB.punya = true;
+    hint('Tiket terusan dibayar. Silakan masuk lewat gapura 🎉', 3500); setTimeout(() => bicara('Asyik, bisa naik semuanya! Mau yang mana dulu?', 4), 800);
+  });
+  $('k-tutup').textContent = 'Nanti dulu';
 }
 function hargaWahana(id) { const h = (D.hargaWahana || {})[id]; return h != null ? h : ({ bianglala: 20000, roller: 35000, histeria: 30000, komidi: 15000 })[id] || 20000; }
 function fmtRpAwal(n) { return 'Rp' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 
 let NAIK_W = null;
 function tawarWahana(id) {
-  const W = WAHANA[id], h = hargaWahana(id);
+  const W = WAHANA[id];
   if (NAIK_W) { hint(NAIK_W.tunggu ? 'Kalian sedang menunggu giliran naik.' : 'Kalian sedang naik wahana.'); return; }
-  kartu(W.emoji, W.nama, `<p style="text-align:center">Tiket ${fmtRp(h)} per orang.<br>Untuk berdua: <b>${fmtRp(h * 2)}</b></p><div class="catatan">Lama main: ${W.durasi}. 💰 Uang kalian: ${fmtRp(DOMPET.sisa)}</div>`, 'Naik ' + fmtRp(h * 2), () => {
-    if (!bayar(h * 2)) { hint(`Uangnya nggak cukup. Tiket ${W.nama} ${fmtRp(h)} per orang.`, 3500); return; }
+  if (!TIKET_TB.punya) { hint('Beli tiket terusan dulu di loket, di samping gapura 🎟️', 3500); return; }
+  kartu(W.emoji, W.nama, `<p style="text-align:center">Sudah termasuk tiket terusan kalian 🎟️</p><div class="catatan">Lama main: ${W.durasi}.</div>`, 'Naik sekarang', () => {
     NAIK_W = { W, tunggu: true, sejak: performance.now() };
-    if (!W.bisaNaik()) hint(id === 'roller' ? 'Tiket dibayar. Tunggu keretanya kembali ke stasiun ya 🎢' : id === 'histeria' ? 'Tiket dibayar. Tunggu sampai kursinya turun ya.' : 'Tiket dibayar. Tunggu giliran gondola berikutnya.', 4000);
+    if (!W.bisaNaik()) hint(id === 'roller' ? 'Tunggu keretanya kembali ke stasiun ya 🎢' : id === 'histeria' ? 'Tunggu sampai kursinya turun ya.' : id === 'ontang' ? 'Tunggu sampai putarannya berhenti ya.' : 'Tunggu giliran gondola berikutnya.', 4000);
   });
   $('k-tutup').textContent = 'Nanti dulu';
 }
@@ -975,7 +1068,7 @@ function naikWahana() {
   duduk = { wahana: W, a: [k.a[0], k.a[1]], b: [k.b[0], k.b[1]], yaw: k.yaw, h: k.a[2] - 0.46, sejak: 0, ngangkang: k.ngangkang };
   tampilBerdiri(false); BALIK.sisa = 0; LIHAT.x = 0;
   camYaw = k.yaw + (W.kameraDepan && mode === 'tpp' ? Math.PI : 0); camPitch = mode === 'tpp' ? 0.25 : 0.05;
-  const kata = { bianglala: 'Dari atas nanti kelihatan seluruh taman.', roller: 'Pegang tanganku yang kuat ya! 😆', histeria: 'Aduh, deg-degan… tapi seru!', komidi: 'Kayak anak kecil lagi, tapi seru!' }[W.id];
+  const kata = { ontang: 'Pegangan ya, nanti kita terbang berputar! 🎪', bianglala: 'Dari atas nanti kelihatan seluruh taman.', roller: 'Pegang tanganku yang kuat ya! 😆', histeria: 'Aduh, deg-degan… tapi seru!', komidi: 'Kayak anak kecil lagi, tapi seru!' }[W.id];
   hint(`Kalian naik ${W.nama}! 🎉`, 3000); setTimeout(() => bicara(kata, 4), 700);
 }
 function turunWahana() {
@@ -1034,7 +1127,7 @@ putar.push((dt) => {
   for (const [k, n] of [['singa', 5], ['harimau', 3], ['beruang', 3], ['zebra', 2], ['bison', 2]]) {
     for (let i = 0; i < n; i++) { const [x, z] = randomIn(ENCL[k], 3); const r = mesh(new THREE.DodecahedronGeometry(1, 0), rc[i % 2], x, 0.4, z, scene); r.scale.set(rand(1, 2.4), rand(0.6, 1.4), rand(1, 2)); }
   }
-  for (const [x, z, r] of [[22, 60, 1.6], [16, 0, 1.4], [11, -40, 1.6], [7, -110, 1.6], [4, -180, 0.4], [-6, -185, -0.4]]) {
+  for (const [x, z, r] of [[25.3, 59.5, 1.57], [16, 0, 1.4], [11, -40, 1.6], [7, -110, 1.6], [4, -180, 0.4], [-6, -185, -0.4]]) {
     const b = new THREE.Group(); b.position.set(x, 0, z); b.rotation.y = r; scene.add(b);
     mesh(box(1.8, 0.1, 0.5), '#8b6440', 0, 0.5, 0, b); mesh(box(1.8, 0.4, 0.08), '#8b6440', 0, 0.8, -0.25, b);
     for (const sx of [-0.75, 0.75]) mesh(box(0.08, 0.5, 0.45), '#333', sx, 0.25, 0, b, false);
@@ -2640,7 +2733,7 @@ const ZONES = [
 ];
 const SPES_ZONA = { flamingo: 'flamingo', gajah: 'gajah', singa: 'singa', unta: 'unta', bison: 'bison', jerapah: 'jerapah', zebra: 'zebra', babyzoo: 'kelinci', burung: 'makaw', harimau: 'harimau', beruang: 'beruang', panda: 'panda' };
 for (const z of ZONES) if (z.sign) { const sp = INFO[SPES_ZONA[z.id]]; papanZona(z.sign[0], z.sign[1], z.sign[2], z.nama.replace('Zona ', ''), sp ? sp.emoji + ' ' + (z.id === 'babyzoo' ? 'kelinci' : '') : '', z.id); }
-papanZona(22, 80, 0, 'Peta Taman', 'Ketuk untuk lihat', 'peta');
+papanZona(25.25, 77.5, Math.PI / 2, 'Peta Taman', 'Ketuk untuk lihat', 'peta');
 addInteract(airTerjunMesh, 'landmark', 'airterjun', 22);
 
 buildGrid();
@@ -2757,6 +2850,7 @@ function openInter(it) {
   else if (it.kind === 'pakan') { bukaBooth(it.data); return; }
   else if (it.kind === 'halte') { bukaJadwal(it.data); return; }
   else if (it.kind === 'wahana') { tawarWahana(it.data); return; }
+  else if (it.kind === 'loketTB') { bukaTiketTB(); return; }
   else if (it.kind === 'surat') { bukaSurat(it.data); return; }
   else if (it.kind === 'kue') { if (KUE.tiup || KUE.potong) return; if (!KUE.ditiup) tanyaTiup(); else if (!KUE.dipotong) potongKue(); else hint('Kuenya enak! Selamat ulang tahun 🎂', 3000); return; }
   else if (it.kind === 'info') { bukaInfo(it.data); return; }
@@ -3387,7 +3481,7 @@ const TIKET = { punya: false, tanyaT: -1e9 };
 function sudahTiket() { return TIKET.punya; }
 function cekGerbang(zLama) {
   if (TIKET.punya && zLama < 90.6 && player.z >= 90.6 && Math.abs(player.x - 30) <= 8) {
-    TIKET.punya = false;
+    TIKET.punya = false; TIKET_TB.punya = false;
     hint('Kalian keluar dari taman. Kalau mau masuk lagi, beli tiket lagi di loket ya.', 4000);
     setTimeout(() => bicara('Kalau masuk lagi bayar tiket lagi lho.', 3), 600);
     return;
@@ -3483,7 +3577,7 @@ function update(dt, t) {
     if (!AUTO.jalur.length && !(AD && AD.jalur.length)) { const f = AUTO.selesai; AUTO = null; if (f) f(); }
     if (AUTO) { kamu.group.position.y = lerp(kamu.group.position.y, AUTO.h(player.x, player.z), Math.min(1, dt * 8)); dia.group.position.y = lerp(dia.group.position.y, (AD ? AD.h : AUTO.h)(partner.x, partner.z), Math.min(1, dt * 8)); }
   }
-  cekGerbang(zSebelum); cekAirTerjun(zSebelum);
+  cekGerbang(zSebelum); cekGerbangTB(); cekAirTerjun(zSebelum);
   const spdAntri = antriPemain ? gerakAntri(dt) : 0;
   player.speed = lerp(player.speed, Math.max(spd, spdAntri, spdAuto), Math.min(1, dt * 8));
   const targetT = mode === 'tpp' ? 1 : 0;
@@ -4859,7 +4953,7 @@ function infoIsi(tab, papan) {
       ['🎟️ Tiket masuk', rp(D.tiketMasuk != null ? D.tiketMasuk : 15000)],
       ['🚙 Jip safari', rp(hargaJip())], ['🚌 Shuttle air terjun', rp(RUTE_SHUTTLE.harga())],
       ['🎬 Tiket bioskop', rp(D.tiketBioskop != null ? D.tiketBioskop : 20000)], ['🍿 Popcorn', rp(D.hargaPopcorn || 25000)], ['🥤 Minum bioskop', rp(D.hargaMinumBioskop || 15000)],
-      ['🎡 Bianglala', rp(W.bianglala || 20000)], ['🎢 Roller coaster', rp(W.roller || 35000)], ['🗼 Histeria', rp(W.histeria || 30000)], ['🎠 Komidi putar', rp(W.komidi || 15000)],
+      ['🎢 Taman bermain (tiket terusan, semua wahana)', rp(hargaTB())],
       ['🥕 Pakan hewan', pakan.length ? 'mulai ' + rp(Math.min(...pakan)) : '-'], ['🍜 Makanan food court', 'mulai ' + rp(D.hargaMakananMin || 15000)]
     ];
     return `<p>Harga per orang:</p><table style="width:100%;border-collapse:collapse;font-size:14px">${baris.map(([a, b]) => `<tr><td style="padding:5px 4px;border-bottom:1px solid #e6dcc6">${a}</td><td style="padding:5px 4px;border-bottom:1px solid #e6dcc6;text-align:right">${b}</td></tr>`).join('')}</table>
@@ -4893,4 +4987,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSemprot(dt); updateS
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };

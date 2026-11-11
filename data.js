@@ -18,6 +18,7 @@ window.SAFARI = {
   hargaMakananMin: 15000,      // harga paling murah per porsi di food court
   tiketMasuk: 15000,           // per orang, berlaku sampai keluar taman atau refresh
   hargaWahana: { bianglala: 20000, roller: 35000, histeria: 30000, komidi: 15000 },   // per orang
+  tiketTamanBermain: 40000,    // tiket terusan per orang: sekali beli, semua wahana
   tiketBioskop: 20000,         // per orang
   hargaPopcorn: 25000,
   hargaMinumBioskop: 15000,
