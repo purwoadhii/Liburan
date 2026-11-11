@@ -1852,6 +1852,17 @@ function animMakan(dt) {
   }
   return true;
 }
+// orang yang kesal berdiri lalu pindah ke kursi kosong di meja lain dan lanjut makan (kalau penuh, baru keluar)
+function pindahMeja(N, mLama) {
+  const lama = N.kursiFC; if (lama) lama.n = null;
+  N.duduk = false; N.P.headParts[0].rotation.x = 0; for (const l of N.P.legs) l.rotation.x = 0;
+  const c = kursiKosong();
+  if (c && !mLama.kursiU.includes(c)) {
+    c.n = N; N.kursiFC = c; const sisa = Math.max(15, N.makanSisa || 30);
+    N.jalur = [[N.x, N.z - 1.3], [c.x, c.z - 1.3], [c.x, c.z]];
+    N.onArrive = () => { npcDuduk(N, c.x, c.z, Math.PI); N.makan = true; N.makanSisa = sisa; };
+  } else { N.kursiFC = null; N.makan = false; N.jalur = [[N.x, N.z - 1.3], [FC_PINTU[0], N.z - 1.3 > 76 ? 76 : N.z - 1.3], FC_PINTU, [rand(40, 85), 88]]; N.pergi = true; }
+}
 function dudukMeja(m) {
   if (duduk && duduk.meja === m) return;   // sudah duduk di meja ini
   // orang yang masih berjalan ke kursi di meja ini: kita duduk duluan, jadi mereka cari kursi lain
@@ -1871,7 +1882,7 @@ function dudukMeja(m) {
       if (!duduk || duduk.meja !== m) return;
       const N = pick(depan); if (!N.duduk) return;
       npcBicara = N; npcBicaraT = 3.5; npcKonteks = 'keluh'; gelNpc.textContent = pick(D.keluhDuduk || ['Ini orang siapa sih? Main duduk aja, nggak permisi! Nggak sopan banget.']); gelNpc.classList.remove('sembunyi');
-      depan.forEach((n, i) => setTimeout(() => { if (n.duduk) n.makanSisa = 0.01; }, 4200 + i * 700));
+      depan.forEach((n, i) => setTimeout(() => { if (n.duduk && duduk && duduk.meja === m) pindahMeja(n, m); }, 4200 + i * 700));
     }, 1300);
   }
   if (pesanan.some(p => !p.dikirim)) kirimPelayan(m);
