@@ -1500,7 +1500,9 @@ function updateWaktu(dt, dalam) {
   // arah matahari / bulan
   const a = (h - 6) / 12 * Math.PI;
   const dx = Math.cos(a), dy = Math.max(0.15, Math.abs(Math.sin(a)));
-  sun.position.set(player.x + dx * 60, dy * 80, player.z + 30); sun.target.position.set(player.x, 0, player.z);
+  // titik pusat bayangan dikunci ke grid texel (64 m / 1024 px) supaya tepi bayangan tidak berkedip/bergetar
+  const gx = Math.round(player.x / 2) * 2, gz = Math.round(player.z / 2) * 2, sa = Math.round(a * 400) / 400;
+  sun.position.set(gx + Math.cos(sa) * 60, Math.max(0.15, Math.abs(Math.sin(sa))) * 80, gz + 30); sun.target.position.set(gx, 0, gz);
   sun.color.copy(cMatahari).lerp(cMatahariSenja, w.senja);
   BULAN.position.set(player.x - dx * 500, 260, player.z - 300); BULAN.material.opacity = clamp(1 - w.terang * 2, 0, 1);
   // lampu taman menyala saat gelap
@@ -2674,7 +2676,7 @@ function openInter(it) {
   else if (it.kind === 'halte') { bukaJadwal(it.data); return; }
   else if (it.kind === 'wahana') { tawarWahana(it.data); return; }
   else if (it.kind === 'surat') { bukaSurat(it.data); return; }
-  else if (it.kind === 'kue') { if (KUE.ditiup) hint('Kuenya enak! Selamat ulang tahun 🎂', 3000); else tanyaTiup(); return; }
+  else if (it.kind === 'kue') { if (KUE.tiup || KUE.potong) return; if (!KUE.ditiup) tanyaTiup(); else if (!KUE.dipotong) potongKue(); else hint('Kuenya enak! Selamat ulang tahun 🎂', 3000); return; }
   else if (it.kind === 'info') { bukaInfo(it.data); return; }
   else if (it.kind === 'bangku') { dudukBangku(it.data); return; }
   else if (it.kind === 'spotFoto') { bukaKamera(it.data); return; }
@@ -3928,20 +3930,35 @@ function updateKunang(dt, t) {
 
 // ---- kue ulang tahun dari pelayan + rombongan + backsound ----
 const KUE = { sudah: false, obj: null, rombongan: [], api: [], audio: null };
+// lapisan kue: [jari-jari, tinggi, y tengah, warna luar, warna potongan]
+const LAPIS_KUE = [[0.18, 0.13, 0.085, '#f7c6d6', '#f3e2c4'], [0.185, 0.025, 0.15, '#ffffff', '#ffffff'], [0.12, 0.1, 0.21, '#fff4e8', '#f6dcb4']];
+const IRIS_KUE = 0.75;   // lebar potongan (radian), dipotong di sisi yang menghadap si cowok
+// bagian kue dari sudut a0 selebar w, lengkap dengan bidang potongannya
+function bagianKue(a0, w) {
+  const g = new THREE.Group(), utuh = w >= Math.PI * 2 - 1e-3;
+  for (const [rr, h, y, war, dalam] of LAPIS_KUE) {
+    g.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, h, 24, 1, false, a0, w), mat(war)), { castShadow: true })).children.at(-1).position.y = y;
+    if (utuh) continue;
+    for (const th of [a0, a0 + w]) {
+      const pl = new THREE.Mesh(new THREE.PlaneGeometry(rr, h), new THREE.MeshLambertMaterial({ color: dalam, side: THREE.DoubleSide }));
+      pl.position.set(Math.sin(th) * rr / 2, y, Math.cos(th) * rr / 2); pl.rotation.y = th - Math.PI / 2; g.add(pl);
+    }
+  }
+  // ceri di tepi lapisan bawah, hanya yang ada di bagian ini
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + 0.2; const d = ((a - a0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); if (d <= w) mesh(sph(0.018, 5, 4), '#d23a3a', Math.sin(a) * 0.15, 0.17, Math.cos(a) * 0.15, g, false); }
+  return g;
+}
 function modelKue() {
   const g = new THREE.Group();
   mesh(cyl(0.24, 0.24, 0.02, 20), '#ffffff', 0, 0.01, 0, g, false);
-  mesh(cyl(0.18, 0.18, 0.13, 20), '#f7c6d6', 0, 0.085, 0, g);
-  mesh(cyl(0.185, 0.185, 0.025, 20), '#ffffff', 0, 0.15, 0, g, false);
-  mesh(cyl(0.12, 0.12, 0.1, 18), '#fff4e8', 0, 0.21, 0, g);
-  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; mesh(sph(0.018, 5, 4), '#d23a3a', Math.cos(a) * 0.15, 0.17, Math.sin(a) * 0.15, g, false); }
-  const api = [];
+  const badan = bagianKue(0, Math.PI * 2); g.add(badan);
+  const api = [], lilin = [];
   for (let i = 0; i < 5; i++) {
     const a = i / 5 * Math.PI * 2, x = Math.cos(a) * 0.07, z = Math.sin(a) * 0.07;
-    mesh(cyl(0.007, 0.007, 0.08, 5), ['#5aa7dc', '#f2d14b', '#e8836f', '#6aa64e', '#d98ad6'][i], x, 0.3, z, g, false);
+    lilin.push(mesh(cyl(0.007, 0.007, 0.08, 5), ['#5aa7dc', '#f2d14b', '#e8836f', '#6aa64e', '#d98ad6'][i], x, 0.3, z, g, false));
     const f = new THREE.Mesh(cone(0.012, 0.035, 6), new THREE.MeshBasicMaterial({ color: '#ffb43a' })); f.position.set(x, 0.358, z); g.add(f); api.push(f);
   }
-  return { g, api };
+  return { g, api, badan, lilin };
 }
 let laguSintetis = null;
 function putarLaguUltah() {
@@ -3977,7 +3994,7 @@ function kirimKue(m) {
   const N = buatNpc(k.depan, { baju: '#f8f4ea', celana: '#26262b', cewek: false });
   N.x = k.depan[0]; N.z = k.depan[1]; N.speed = 1.0; N.pelayan = true; N.gedung = 'fc'; N.bawa = true;
   const baki = new THREE.Group(); baki.position.set(0, 1.02, 0.42); N.P.group.add(baki);
-  const kue = modelKue(); baki.add(kue.g); KUE.api = kue.api;
+  const kue = modelKue(); baki.add(kue.g); KUE.api = kue.api; KUE.model = kue; KUE.dipotong = false; KUE.ditiup = false;
   N.jalur = [lewat, [m.x, m.z - 1.35]];
   KUE.rombongan = [N];
   const posisi = [[m.x - 1.5, m.z - 1.4], [m.x + 1.5, m.z - 1.4], [m.x - 2.1, m.z], [m.x + 2.1, m.z]];
@@ -4005,6 +4022,7 @@ function tanyaTiup() {
   if (!KUE.obj || KUE.ditiup) return;
   const U = KJ.ultah || {}, nama = KJT(U, 'nama', '');
   rantaiTanya = rantaiTanya.then(() => new Promise(res => {
+    if (!KUE.obj || KUE.ditiup) { res(); return; }
     kartu('🎂', 'Selamat Ulang Tahun' + (nama ? ', ' + nama : '') + '!', `<p style="text-align:center;font-size:17px;line-height:1.5">${escH(KJT(U, 'ucapan', 'Semoga semua harapanmu terkabul. Terima kasih sudah jadi orang paling spesial 💖')).replace(/\n/g, '<br>')}</p><label style="display:block;font-weight:600;margin-top:10px">🙏 Tulis permohonanmu dulu</label><textarea id="wish" maxlength="300" rows="3" placeholder="Aku berharap…" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border-radius:12px;border:1.5px solid #e2dccd;margin-top:6px"></textarea><div class="catatan">Setelah menulis permohonan, tiup lilinnya.</div>`, 'Tiup lilin 🕯️', () => {
       const w = ($('wish').value || '').trim();
       if (!w) { res(); hint('Tulis permohonannya dulu ya, baru tiup lilin 🙏', 3000); setTimeout(tanyaTiup, 400); return; }
@@ -4015,9 +4033,33 @@ function tanyaTiup() {
     $('k-tutup').textContent = 'Nanti dulu'; kartuTidak = () => { res(); hint('Pesanan makanan diantar setelah tiup lilin. Ketuk kuenya kalau sudah siap 🎂', 4000); };
   }));
 }
+// tiup lilin: si cewek mencondongkan badan, meniup, api padam satu per satu, lalu asap tipis
 function tiupLilin() {
-  if (KUE.ditiup) return; KUE.ditiup = true;
-  for (const f of KUE.api) f.visible = false;
+  if (KUE.ditiup || KUE.tiup) return; KUE.ditiup = true;
+  KUE.tiup = { t: 0, padam: 0, asap: [] };
+  gelKamu.textContent = 'Fuuuh… 🌬️'; gelKamu.classList.remove('sembunyi'); kamuBicaraT = 1.8;
+}
+function updateTiup(dt) {
+  const T = KUE.tiup; if (!T) return;
+  T.t += dt;
+  const condong = T.t < 0.4 ? T.t / 0.4 : T.t > 2.2 ? Math.max(0, 1 - (T.t - 2.2) / 0.5) : 1;
+  kamu.headParts[0].rotation.x = condong * 0.4;
+  if (KUE.obj && T.t > 0.45 && T.t < 1.8 && Math.random() < dt * 14) { kamu.headParts[0].getWorldPosition(tmpB); tmpB.lerp(KUE.obj.position, 0.35); tmpB.y = 1.25; hearts(tmpB, 1, '💨'); }
+  // api tertiup: miring menjauh lalu padam satu per satu
+  KUE.api.forEach((f, i) => {
+    if (!f.visible) return;
+    if (T.t > 0.45) { f.rotation.x = -0.9 * Math.min(1, (T.t - 0.45) * 3); f.scale.y = Math.max(0.2, 1 - (T.t - 0.45)); }
+    if (T.t > 0.75 + i * 0.18) {
+      f.visible = false; f.getWorldPosition(tmpA);
+      const asap = new THREE.Mesh(sph(0.025, 6, 5), new THREE.MeshBasicMaterial({ color: '#d9d9d9', transparent: true, opacity: 0.7, depthWrite: false }));
+      asap.position.copy(tmpA); scene.add(asap); T.asap.push({ m: asap, t: 0 });
+    }
+  });
+  for (const a of T.asap) { a.t += dt; a.m.position.y += dt * 0.25; a.m.position.x += Math.sin(a.t * 4) * dt * 0.05; a.m.scale.setScalar(1 + a.t * 1.6); a.m.material.opacity = Math.max(0, 0.7 - a.t * 0.35); }
+  if (T.t > 2.7) { for (const a of T.asap) scene.remove(a.m); KUE.tiup = null; kamu.headParts[0].rotation.x = 0; setelahTiup(); }
+}
+function setelahTiup() {
+  if (!KUE.obj) return;
   const p = KUE.obj.position.clone().setY(1.1);
   hearts(p, 8, '🎉'); setTimeout(() => hearts(p, 6, '💖'), 400);
   setTimeout(() => bicara(KJT(KJ.ultah, 'kataPasangan', 'Selamat ulang tahun, sayang. Semoga semua harapanmu terkabul. 💖'), 6), 700);
@@ -4029,8 +4071,82 @@ function tiupLilin() {
     KUE.rombongan = [];
   }, 3500);
   if (KUE.wish) setTimeout(() => hint('✨ Permohonanmu sudah terucap. Semoga terkabul!', 3500), 1500);
-  // setelah rombongan pergi, pelayan datang merapikan kue, baru pesanan diantar
-  setTimeout(() => rapikanKue(m), 9000);
+  // kue tetap di meja: ketuk kuenya untuk memotong. Kalau tidak dipotong, pelayan merapikan setelah 60 detik
+  KUE.meja = m;
+  setTimeout(() => { if (KUE.obj && !KUE.dipotong) { hint('Ketuk kuenya untuk memotong dan memberikan potongan pertama ke dia 🔪🍰', 5000); setTimeout(() => bicara('Potong kuenya yuk, sayang 😊', 4), 800); } }, 5000);
+  clearTimeout(KUE.batas); KUE.batas = setTimeout(() => { if (KUE.obj && !KUE.dipotong && !KUE.potong) rapikanKue(m); }, 60000);
+}
+// potong kue: pisau memotong dua kali, potongan diangkat ke piring kecil, si cewek memberikannya ke si cowok
+function potongKue() {
+  if (!KUE.obj || KUE.dipotong || KUE.potong || KUE.tiup || !KUE.model) return;
+  if (!(duduk && duduk.meja)) { hint('Duduk dulu di mejanya ya 🎂', 2500); return; }
+  KUE.dipotong = true; clearTimeout(KUE.batas);
+  const g = KUE.obj;
+  // potongan diambil dari sisi depan kue (menghadap kamera di seberang meja), sedikit ke arah si cowok
+  const keDia = Math.PI - 0.35;
+  const a0 = keDia - IRIS_KUE / 2;
+  const pisau = new THREE.Group();
+  mesh(box(0.004, 0.035, 0.2), '#d9dde2', 0, 0, 0, pisau, false);
+  mesh(box(0.014, 0.03, 0.09), '#3a2a1e', 0, 0.005, -0.14, pisau, false);
+  scene.add(pisau);
+  KUE.potong = { t: 0, fase: 0, a0, keDia, pisau };
+  KUE.model.lilin.forEach(l => l.visible = false); KUE.api.forEach(f => f.visible = false);
+  bicara('Potongan pertama buat siapa ya… 😏', 3);
+}
+function updatePotong(dt) {
+  const P = KUE.potong; if (!P) return;
+  P.t += dt;
+  const g = KUE.obj; if (!g) { if (P.pisau) scene.remove(P.pisau); KUE.potong = null; return; }
+  const S = g.scale.x, cx = g.position.x, cz = g.position.z, yAtas = g.position.y + 0.32 * S, yBawah = g.position.y + 0.04 * S;
+  const tangan = kamu.arms[1];
+  if (P.fase === 0 || P.fase === 1) {
+    // dua kali memotong, di kedua sisi potongan
+    const th = P.fase === 0 ? P.a0 : P.a0 + IRIS_KUE, u = Math.min(1, P.t / 1.1);
+    const turun = u < 0.25 ? 0 : u < 0.75 ? (u - 0.25) / 0.5 : 1 - (u - 0.75) / 0.25;
+    const rr = 0.1 * S;
+    P.pisau.position.set(cx + Math.sin(th) * rr, lerp(yAtas + 0.05, yBawah + 0.02, turun) + 0.0175, cz + Math.cos(th) * rr);
+    P.pisau.rotation.set(0, th, 0);
+    tmpA.copy(P.pisau.position); tmpA.y += 0.04; aimArm(kamu, tangan, tmpA);
+    if (u >= 1) {
+      P.fase++; P.t = 0;
+      if (P.fase === 2) {
+        scene.remove(P.pisau); P.pisau = null;
+        // ganti kue utuh dengan sisa + potongan di piring kecil
+        g.remove(KUE.model.badan); const sisa = bagianKue(P.a0 + IRIS_KUE, Math.PI * 2 - IRIS_KUE); g.add(sisa); KUE.model.badan = sisa;
+        const iris = new THREE.Group(); const isi = bagianKue(P.a0, IRIS_KUE); iris.add(isi);
+        // geser potongan supaya ujungnya di tengah piring kecil
+        isi.position.set(-Math.sin(P.keDia) * 0.09, 0.012, -Math.cos(P.keDia) * 0.09);
+        mesh(cyl(0.11, 0.11, 0.012, 18), '#ffffff', 0, 0.006, 0, iris, false);
+        iris.scale.setScalar(S); iris.position.set(cx + Math.sin(P.keDia) * 0.09 * S, g.position.y, cz + Math.cos(P.keDia) * 0.09 * S);
+        scene.add(iris); P.iris = iris; P.dari = iris.position.clone();
+        // di depan si cowok, di atas meja
+        P.ke = new THREE.Vector3(duduk.b[0], g.position.y, (duduk.meja ? duduk.meja.z : cz) + 0.32);
+        gelKamu.textContent = 'Potongan pertama buat kamu 🥰'; gelKamu.classList.remove('sembunyi'); kamuBicaraT = 3;
+      }
+    }
+  } else if (P.fase === 2) {
+    // si cewek mengangkat potongan dan memberikannya ke si cowok
+    const u = Math.min(1, P.t / 1.6), e = ease(u);
+    P.iris.position.lerpVectors(P.dari, P.ke, e); P.iris.position.y += Math.sin(u * Math.PI) * 0.25;
+    tmpA.copy(P.iris.position); tmpA.y += 0.05; aimArm(kamu, tangan, tmpA);
+    if (u >= 1) { P.fase = 3; P.t = 0; tmpB.copy(P.ke).setY(1.3); hearts(tmpB, 6, '💖'); bicara(KJT(KJ.ultah, 'kataKue', 'Makasih, sayang. Potongan pertamanya buat aku? 🥰'), 4); }
+  } else if (P.fase === 3) {
+    // si cowok mencicipi: tangannya ke piring lalu ke mulut, potongan mengecil
+    if (P.t > 1.2) {
+      const ph = (P.t - 1.2) * 3.2, angkat = Math.max(0, Math.sin(ph));
+      tmpA.copy(P.ke); tmpA.y += 0.08; dia.headParts[0].getWorldPosition(tmpB); tmpB.y -= 0.12;
+      tmpA.lerp(tmpB, angkat); aimArm(dia, dia.arms[0], tmpA);
+      dia.headParts[0].rotation.x = 0.15 + angkat * 0.1;
+      const sisa = Math.max(0.05, 1 - (P.t - 1.2) / 5); P.iris.children[0].scale.setScalar(sisa);
+    }
+    if (P.t > 6.4) {
+      P.fase = 4; P.t = 0; dia.headParts[0].rotation.x = 0; P.iris.children[0].visible = false;
+      bicara(KJT(KJ.ultah, 'kataKueEnak', 'Enak banget! Kayak kamu, manis 😋💕'), 4);
+    }
+  } else if (P.fase === 4 && P.t > 3) {
+    KUE.potong = null; KUE.irisan = P.iris;
+    rapikanKue(KUE.meja);
+  }
 }
 function rapikanKue(m) {
   if (!KUE.obj || !m || !(duduk && duduk.meja === m)) { hapusKue(); lepasTahanKue(); return; }
@@ -4050,12 +4166,37 @@ function rapikanKue(m) {
   };
 }
 function hapusKue() {
+  if (KUE.irisan) { scene.remove(KUE.irisan); KUE.irisan = null; }
+  if (KUE.potong) { if (KUE.potong.pisau) scene.remove(KUE.potong.pisau); if (KUE.potong.iris) scene.remove(KUE.potong.iris); KUE.potong = null; }
   if (!KUE.obj) return;
   scene.remove(KUE.obj); const ix = interactables.findIndex(x => x.obj === KUE.obj); if (ix >= 0) interactables.splice(ix, 1);
   KUE.obj = null;
 }
+// kamera dekat ke meja saat tiup lilin & potong kue: dari seberang meja, melihat kue dan wajah kalian
+const KAM_KUE = { k: 0, p: new THREE.Vector3(), l: new THREE.Vector3() };
+function kameraKue(dt) {
+  const aktif = !!(KUE.obj && (KUE.tiup || KUE.potong) && duduk && duduk.meja);
+  KAM_KUE.k = clamp(KAM_KUE.k + (aktif ? dt : -dt) * 1.6, 0, 1);
+  if (KAM_KUE.k <= 0 || !KUE.obj) return;
+  const m = duduk && duduk.meja ? duduk.meja : null, cx = KUE.obj.position.x, cz = KUE.obj.position.z;
+  const zKursi = m ? m.z + 0.85 : cz + 0.85;
+  tmpA.set(cx + 0.2, 1.7, cz - 1.65); tmpB.set(cx, 0.98, (cz + zKursi) / 2 - 0.05);
+  const e = ease(KAM_KUE.k);
+  camera.position.lerp(tmpA, e);
+  KAM_KUE.l.copy(camera.position).add(camera.getWorldDirection(tmpC).multiplyScalar(2)).lerp(tmpB, e);
+  camera.lookAt(KAM_KUE.l);
+  kamu.headParts.forEach(h => h.visible = true);
+  // orang lain yang menghalangi kamera disembunyikan sebentar
+  for (const N of npcs) if (Math.hypot(N.x - camera.position.x, N.z - camera.position.z) < 1.3) N.P.group.visible = false;
+  // gelembung bicara ikut kamera dekat
+  camera.updateMatrixWorld();
+  const taruh = (el, x, y, z) => { tmpA.set(x, y, z).project(camera); if (tmpA.z >= 1) return; const hw = el.offsetWidth / 2 + 8; el.style.left = clamp((tmpA.x + 1) / 2 * innerWidth, hw, innerWidth - hw) + 'px'; el.style.top = clamp((1 - tmpA.y) / 2 * innerHeight, 80, innerHeight - 40) + 'px'; };
+  if (kamuBicaraT > 0) taruh(gelKamu, player.x, kamu.group.position.y + 1.95, player.z);
+  if (bubbleTimer > 0) { taruh(ui.gelembung, partner.x, 2.05, partner.z); ui.gelembung.textContent = ui.gelembung.textContent.replace(/^💬 /, ''); }
+}
 function updateKue(dt, t) {
-  for (const f of KUE.api) if (f.visible) f.scale.set(1, 0.8 + Math.sin(t * 20 + f.position.x * 50) * 0.25, 1);
+  if (!KUE.tiup) for (const f of KUE.api) if (f.visible) f.scale.set(1, 0.8 + Math.sin(t * 20 + f.position.x * 50) * 0.25, 1);
+  updateTiup(dt); updatePotong(dt); kameraKue(dt);
   for (const R of KUE.rombongan) if (R.tepuk && Math.random() < dt * 0.9) { tmpB.set(R.x, 2.1, R.z); hearts(tmpB, 1, pick(['🎵', '👏', '🎶'])); }
 }
 
@@ -4670,4 +4811,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSemprot(dt); updateS
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
