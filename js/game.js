@@ -271,7 +271,7 @@ const LOKET_GRUP = [];
   const belakang = papan.clone(); belakang.rotation.y = Math.PI; belakang.position.z = gz - 0.48; scene.add(belakang);
   mesh(box(10.4, 2.5, 0.5), kayu, 30, 5.2, gz, scene);
   // loket
-  for (const sx of [-12, 12]) {
+  for (const sx of [12]) {   // satu loket saja, di kanan gerbang
     const lk = new THREE.Group(); lk.position.set(30 + sx, 0, gz + 1); scene.add(lk);
     mesh(box(1.8, 1.0, 0.05), '#2a2a2a', 0, 1.6, 1.52, lk, false);
     mesh(box(2.2, 0.12, 0.5), '#8b6440', 0, 1.05, 1.7, lk, false);
@@ -1526,7 +1526,7 @@ KIOS.forEach((k, i) => {
 BIOS.antrian = buatAntrian([72.5, 84.7], [0, 1], 'tiket', null, 2);
 for (let n = 0; n < 2; n++) { const [x, z] = slotAntri(BIOS.antrian, n); const N = npcGedung(buatNpc([x, z]), 'bios'); N.x = x; N.z = z; tambahKeAntrian(BIOS.antrian, N); }
 // antrean loket masuk: ramai saat taman baru buka dan siang hari
-const LOKET_MASUK = [0, 1].map(i => { const q = buatAntrian([i ? 42 : 18, 93.6], [0, 1], 'masuk', i, 4); q.ramaiFn = h => clamp(Math.exp(-((h - 9) ** 2) / 1.6) + 0.7 * Math.exp(-((h - 13.5) ** 2) / 2) + 0.15, 0, 1) * (h < 7.5 || h > 17 ? 0.1 : 1); return q; });
+const LOKET_MASUK = [0].map(i => { const q = buatAntrian([42, 93.6], [0, 1], 'masuk', i, 6); q.ramaiFn = h => clamp(Math.exp(-((h - 9) ** 2) / 1.6) + 0.7 * Math.exp(-((h - 13.5) ** 2) / 2) + 0.15, 0, 1) * (h < 7.5 || h > 17 ? 0.1 : 1); return q; });
 LOKET_GRUP.forEach((lk, i) => { const it = addInteract(lk, 'loketMasuk', i, 4.2); it.label = '🎟️ Beli tiket masuk'; });
 setTimeout(() => { for (const q of LOKET_MASUK) { const n = Math.round(q.dasar * q.ramaiFn(WAKTU.jam)); for (let i = 0; i < n; i++) { const [x, z] = slotAntri(q, i); const N = buatNpc([x, z]); N.x = x; N.z = z; N.yaw = arahAntri(q); tambahKeAntrian(q, N); } } }, 0);
 $('btn-antri').onclick = () => { keluarAntrian(); hint('Kalian keluar dari antrean.'); };
@@ -3490,7 +3490,7 @@ function cekGerbang(zLama) {
   player.z = 90.6;
   if (paused || performance.now() - TIKET.tanyaT < 4000) return;
   TIKET.tanyaT = performance.now();
-  hint('Beli tiket masuk dulu di loket, rumah kecil di kiri dan kanan gerbang.', 3500);
+  hint('Beli tiket masuk dulu di loket, rumah kecil di kanan gerbang.', 3500);
   setTimeout(() => bicara('Eh, kita belum beli tiket. Ke loket dulu yuk.', 3.5), 500);
 }
 function bukaTiketMasuk() {
