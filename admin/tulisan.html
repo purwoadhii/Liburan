@@ -30,12 +30,15 @@ button.hapus{background:#f6dede;color:var(--merah);padding:6px 14px;font-size:13
 .tulisan .atas span{opacity:.65}
 .tulisan .isi{white-space:pre-wrap;word-break:break-word;margin:8px 0;font-size:16px;line-height:1.5;background:repeating-linear-gradient(#fffaf0 0 25px,#ece3cf 25px 26px);padding:4px 10px;border-radius:8px}
 .kosong{text-align:center;opacity:.6;padding:24px 0}
+.tulisan img{display:block;max-width:100%;width:320px;border-radius:10px;margin:8px 0;background:#eee}
+.tulisan .baris{margin-top:6px}
+.tulisan a.unduh{font-size:13px;text-decoration:none;background:#e6e1d4;color:var(--teks);border-radius:999px;padding:6px 14px}
 </style>
 </head>
 <body>
 <main>
-  <h1>📝 Tulisan dari Game</h1>
-  <p class="kecil">Semua yang diketik di game Liburan masuk ke sini: balasan surat untuk kelinci, gajah dan jerapah, permohonan saat tiup lilin, dan balasan ke orang lain di taman. <a href="./">← Kembali ke Admin</a></p>
+  <h1>📝 Tulisan & Foto dari Game</h1>
+  <p class="kecil">Semua yang diketik di game Liburan masuk ke sini: balasan surat untuk kelinci, gajah dan jerapah, permohonan saat tiup lilin, balasan ke orang lain di taman, dan foto yang diambil di game (tombol 📷 dan spot foto). <a href="./">← Kembali ke Admin</a></p>
 
   <div class="kartu">
     <label for="sandi">Sandi baca</label>
@@ -69,8 +72,8 @@ button.hapus{background:#f6dede;color:var(--merah);padding:6px 14px;font-size:13
       return r.json().catch(function () { return {}; }).then(function (j) { var m = j.message || ('HTTP ' + r.status); if (/Sandi salah/.test(m)) m = 'Sandi baca salah.'; throw new Error(m); });
     });
   }
-  function jenis(b) { return /^Balasan surat/.test(b) ? 'surat' : /lilin/.test(b) ? 'lilin' : /^Balasan ke orang/.test(b) ? 'orang' : 'lain'; }
-  var LABEL = { semua: 'Semua', surat: '💌 Balasan surat', lilin: '🎂 Permohonan', orang: '💬 Ke orang lain', lain: 'Lainnya' };
+  function jenis(b) { return /^Foto /.test(b) ? 'foto' : /^Balasan surat/.test(b) ? 'surat' : /lilin/.test(b) ? 'lilin' : /^Balasan ke orang/.test(b) ? 'orang' : 'lain'; }
+  var LABEL = { semua: 'Semua', foto: '📷 Foto', surat: '💌 Balasan surat', lilin: '🎂 Permohonan', orang: '💬 Ke orang lain', lain: 'Lainnya' };
   function tampil() {
     var hitung = { semua: semua.length }; semua.forEach(function (r) { var j = jenis(r.bagian); hitung[j] = (hitung[j] || 0) + 1; });
     $('saring').innerHTML = Object.keys(LABEL).filter(function (k) { return hitung[k]; }).map(function (k) { return '<button data-k="' + k + '" class="' + (k === saring ? 'aktif' : '') + '">' + LABEL[k] + ' (' + hitung[k] + ')</button>'; }).join('');
@@ -78,10 +81,14 @@ button.hapus{background:#f6dede;color:var(--merah);padding:6px 14px;font-size:13
     var w = $('daftar'); w.innerHTML = rows.length ? '' : '<div class="kosong">Belum ada tulisan.</div>';
     rows.forEach(function (r) {
       var d = document.createElement('div'); d.className = 'tulisan';
-      d.innerHTML = '<div class="atas"><b>' + escH(r.bagian) + '</b><span>' + escH(waktu(r.waktu)) + (r.nama ? ' · ' + escH(r.nama) : '') + '</span></div><div class="isi">' + escH(r.teks) + '</div><button class="hapus">Hapus</button>';
+      if (r.foto) {
+        var nm = 'foto-liburan-' + String(r.waktu).slice(0, 10) + '.jpg';
+        d.innerHTML = '<div class="atas"><b>📷 ' + escH(r.tempat || 'Foto') + '</b><span>' + escH(waktu(r.waktu)) + (r.nama ? ' · ' + escH(r.nama) : '') + '</span></div>' + (r.foto === 'kurang' ? '<div class="isi">Fotonya belum lengkap terkirim.</div>' : '<img alt="Foto dari game" src="' + r.foto + '"><div class="baris"><a class="unduh" download="' + nm + '" href="' + r.foto + '">⬇️ Unduh</a></div>') + '<button class="hapus">Hapus</button>';
+      } else d.innerHTML = '<div class="atas"><b>' + escH(r.bagian) + '</b><span>' + escH(waktu(r.waktu)) + (r.nama ? ' · ' + escH(r.nama) : '') + '</span></div><div class="isi">' + escH(r.teks) + '</div><button class="hapus">Hapus</button>';
       d.querySelector('button').onclick = function () {
-        if (!confirm('Hapus tulisan ini? Tidak bisa dikembalikan.')) return;
-        panggil('rpc/hapus_tulisan', { sandi: $('sandi').value, nomor: r.id }).then(function () { semua = semua.filter(function (x) { return x !== r; }); tampil(); }).catch(function (e) { alert('Gagal menghapus: ' + e.message); });
+        if (!confirm(r.foto ? 'Hapus foto ini? Tidak bisa dikembalikan.' : 'Hapus tulisan ini? Tidak bisa dikembalikan.')) return;
+        var ids = r.ids || [r.id];
+        ids.reduce(function (pr, id) { return pr.then(function () { return panggil('rpc/hapus_tulisan', { sandi: $('sandi').value, nomor: id }); }); }, Promise.resolve()).then(function () { semua = semua.filter(function (x) { return x !== r; }); tampil(); }).catch(function (e) { alert('Gagal menghapus: ' + e.message); });
       };
       w.appendChild(d);
     });
@@ -93,7 +100,16 @@ button.hapus{background:#f6dede;color:var(--merah);padding:6px 14px;font-size:13
     panggil('rpc/baca_tulisan', { sandi: s }).then(function (baris) {
       try { localStorage.setItem(KUNCI, s); } catch (e) {}
       semua = (baris || []).filter(function (r) { return r.tokoh === 'liburan'; });
-      status('ok', semua.length ? semua.length + ' tulisan dari game Liburan.' : 'Belum ada tulisan dari game Liburan.');
+      // foto dikirim terpotong beberapa baris: "Foto <id> <urut>/<jumlah> <tempat>" -> disatukan lagi
+      var grup = {};
+      (baris || []).forEach(function (r) {
+        if (r.tokoh !== 'liburanfoto') return; var m = /^Foto (\S+) (\d+)\/(\d+) ?(.*)$/.exec(r.bagian || ''); if (!m) return;
+        var g = grup[m[1]] || (grup[m[1]] = { bagian: 'Foto ', tempat: m[4], n: +m[3], pot: [], ids: [], waktu: r.waktu, nama: r.nama, id: r.id });
+        g.pot[+m[2] - 1] = r.teks; g.ids.push(r.id); if (r.waktu < g.waktu) g.waktu = r.waktu;
+      });
+      Object.keys(grup).forEach(function (k) { var g = grup[k], lengkap = true; for (var i = 0; i < g.n; i++) if (!g.pot[i]) lengkap = false; g.foto = lengkap && /^[A-Za-z0-9+\/=]+$/.test(g.pot.join('')) ? 'data:image/jpeg;base64,' + g.pot.join('') : 'kurang'; semua.push(g); });
+      semua.sort(function (a, b) { return a.waktu < b.waktu ? 1 : -1; });
+      status('ok', semua.length ? semua.length + ' tulisan dan foto dari game Liburan.' : 'Belum ada tulisan atau foto dari game Liburan.');
       $('hasil').hidden = false; $('segarkan').hidden = false; tampil();
     }).catch(function (e) { status('gagal', 'Gagal: ' + e.message); });
   }

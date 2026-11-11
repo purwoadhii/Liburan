@@ -437,7 +437,7 @@ let airTerjunMesh;
 /* ------------------------------------------------------------------ trees */
 const treeData = [];
 function farFromRoad(x, z, m) { for (const p of roadPts) { if (Math.abs(p.x - x) > 12 || Math.abs(p.z - z) > 12) continue; if (Math.hypot(p.x - x, p.z - z) < p.w + m) return false; } return true; }
-const AREA_BEBAS = [[8.6, -6, 2.6], [15.3, -74, 2.6], [-0.6, -128, 2.6], [36.5, 66, 2.6], [14.5, 36.5, 2], [7.6, -168, 2], [36.4, 83, 2], [19.5, -38, 2], [-21, 56.5, 2], [45, 26, 2], [13, 71.5, 19], [-5, 77, 14], [-9.3, 100, 13], [76, -50, 14], [60, -48, 5], [50, 68, 16], [75, 68, 17], [62, 84, 12], [40, 80, 8], [30, 116, 36], [30, 90, 12], [55, -20, 22], [-80, -135, 16], [0, -208, 15], [-28, -150, 6]];
+const AREA_BEBAS = [[-15.5, 80.5, 3], [8.6, -6, 2.6], [15.3, -74, 2.6], [-0.6, -128, 2.6], [36.5, 66, 2.6], [14.5, 36.5, 2], [7.6, -168, 2], [36.4, 83, 2], [19.5, -38, 2], [-21, 56.5, 2], [45, 26, 2], [13, 71.5, 19], [-5, 77, 14], [-9.3, 100, 13], [76, -50, 14], [60, -48, 5], [50, 68, 16], [75, 68, 17], [62, 84, 12], [40, 80, 8], [30, 116, 36], [30, 90, 12], [55, -20, 22], [-80, -135, 16], [0, -208, 15], [-28, -150, 6]];
 function bebasArea(x, z) { for (const [ax, az, r] of AREA_BEBAS) if (Math.hypot(x - ax, z - az) < r) return false; return true; }
 function bolehPohon(x, z) {
   if (!farFromRoad(x, z, 3)) return false;
@@ -2631,6 +2631,24 @@ function simpanTulisan(bagian, teks) {
   const U = (window.KEJUTAN || {}).ultah || {};
   try { fetch(u + '/rest/v1/tulisan', { method: 'POST', keepalive: true, headers: h, body: JSON.stringify({ bagian: String(bagian).slice(0, 80), teks: String(teks).slice(0, 3000), nama: String(U.nama || '').slice(0, 80), tokoh: 'liburan' }) }).catch(() => {}); } catch (e) {}
 }
+// foto dari game ikut tersimpan: dikecilkan, lalu dipotong beberapa baris (batas 3000 huruf per baris) dan disatukan lagi di admin
+function simpanFoto(tempat, sumber) {
+  const u = String(D.dbUrl || '').replace(/\/+$/, ''), k = String(D.dbKey || '');
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(u) || !k) return false;
+  try {
+    const sw = sumber.videoWidth || sumber.naturalWidth || sumber.width, sh = sumber.videoHeight || sumber.naturalHeight || sumber.height; if (!sw || !sh) return false;
+    const sk = Math.min(1, 420 / Math.max(sw, sh)), c = document.createElement('canvas'); c.width = Math.round(sw * sk); c.height = Math.round(sh * sk);
+    c.getContext('2d').drawImage(sumber, 0, 0, c.width, c.height);
+    const b64 = c.toDataURL('image/jpeg', 0.55).split(',')[1] || ''; if (!b64) return false;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5), n = Math.ceil(b64.length / 2900); if (n > 40) return false;
+    const U = (window.KEJUTAN || {}).ultah || {}, rows = [];
+    for (let i = 0; i < n; i++) rows.push({ bagian: `Foto ${id} ${i + 1}/${n} ${tempat}`.slice(0, 80), teks: b64.slice(i * 2900, (i + 1) * 2900), nama: String(U.nama || '').slice(0, 80), tokoh: 'liburanfoto' });
+    const h = { apikey: k, 'Content-Type': 'application/json', Prefer: 'return=minimal' }; if (/^eyJ/.test(k)) h.Authorization = 'Bearer ' + k;
+    fetch(u + '/rest/v1/tulisan', { method: 'POST', headers: h, body: JSON.stringify(rows) }).catch(() => {});
+    return true;
+  } catch (e) { return false; }
+}
+function catatFoto(ok) { let el = $('foto-catatan'); if (!el) { el = document.createElement('div'); el.id = 'foto-catatan'; el.style.cssText = 'font-size:13px;opacity:.85;margin-top:8px;text-align:center;color:#fff'; $('foto-img').insertAdjacentElement('afterend', el); } el.textContent = ok ? '📤 Foto ini juga tersimpan di album kenangan.' : ''; }
 function bukaBalas() {
   const N = npcBicara; if (!N) return;
   const ctx = npcKonteks, kata = gelNpc.textContent;
@@ -3335,6 +3353,7 @@ $('btn-foto').onclick = () => {
   const url = canvas.toDataURL('image/png');
   $('hud').classList.remove('sembunyi');
   $('foto-img').src = url; $('foto-unduh').href = url;
+  catatFoto(simpanFoto('Layar game · ' + (ui.zona.textContent || 'Taman'), canvas));
   paused = true; $('hasil-foto').classList.remove('sembunyi');
 };
 $('foto-tutup').onclick = () => { $('hasil-foto').classList.add('sembunyi'); paused = false; };
@@ -4670,8 +4689,8 @@ function spotFoto(x, z, rot, nama) {
   const w = '#f27aa6';
   mesh(box(2.6, 0.16, 0.12), w, 0, 2.5, 0, g); mesh(box(2.6, 0.16, 0.12), w, 0, 0.6, 0, g);
   mesh(box(0.16, 2.0, 0.12), w, -1.25, 1.55, 0, g); mesh(box(0.16, 2.0, 0.12), w, 1.25, 1.55, 0, g);
-  const papan = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.5), new THREE.MeshLambertMaterial({ map: textTex(['📸 SPOT FOTO'], { w: 512, h: 116, size: 60, bg: '#2f5d3a', border: '#f2d14b' }), side: THREE.DoubleSide }));
-  papan.position.set(0, 2.95, 0); g.add(papan);
+  const papan = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.5), new THREE.MeshLambertMaterial({ map: textTex(['📸 SPOT FOTO'], { w: 512, h: 116, size: 60, bg: '#2f5d3a', border: '#f2d14b' }) }));
+  papan.position.set(0, 2.95, 0.02); g.add(papan); const papan2 = papan.clone(); papan2.rotation.y = Math.PI; papan2.position.z = -0.02; g.add(papan2);
   const tanda = new THREE.Mesh(new THREE.CircleGeometry(0.9, 20), new THREE.MeshLambertMaterial({ map: textTex(['📷'], { w: 128, h: 128, size: 70, bg: '#f2d14b', border: '#ffffff' }), polygonOffset: true, polygonOffsetFactor: -4 }));
   tanda.rotation.x = -Math.PI / 2; tanda.position.set(0, 0.04, 1.6); g.add(tanda);
   addCircle(x + Math.cos(rot) * 1.25, z - Math.sin(rot) * 1.25, 0.2); addCircle(x - Math.cos(rot) * 1.25, z + Math.sin(rot) * 1.25, 0.2);
@@ -4680,7 +4699,7 @@ function spotFoto(x, z, rot, nama) {
 }
 spotFoto(38.5, 86, 0.5, 'Pintu Masuk');
 spotFoto(9, -196, 0.5, 'Air Terjun');
-spotFoto(73, -12, 0.3, 'Taman Rekreasi');
+spotFoto(-16, 80.5, Math.PI / 2, 'Danau Flamingo');
 
 const KAM = { stream: null, depan: true };
 const kamEl = document.createElement('div');
@@ -4733,6 +4752,7 @@ $('kam-jepret').onclick = () => {
   x.save(); if (KAM.depan) { x.translate(W, 0); x.scale(-1, 1); } x.drawImage(v, (W - vw) / 2, (H - vh) / 2, vw, vh); x.restore();
   gambarHias(x, W, H, KAM.nama);
   const url = c.toDataURL('image/jpeg', 0.92);
+  catatFoto(simpanFoto('Kamera · ' + KAM.nama, c));
   matikanKamera(); kamEl.classList.add('sembunyi');
   $('foto-img').src = url; $('foto-unduh').href = url; $('foto-unduh').download = 'foto-safari.jpg';
   $('hasil-foto').classList.remove('sembunyi');
@@ -5234,7 +5254,7 @@ function infoIsi(tab, papan) {
     <li>🎆 <b>00.00</b> · Kembang api dari puncak air terjun.${malam && j >= 21 ? ' <b style="color:#b33">Malam ini!</b>' : ''}</li>
     <li>🚙 Setiap saat · Jip keliling dari Terminal, zona safari, sampai Air Terjun. Turun di halte mana saja.</li>
     <li>🦒 Siang hari · Beri makan jerapah, gajah, zebra, unta, bison dan kelinci di booth pakan.</li>
-    <li>📸 Spot foto di gerbang, area rekreasi dan air terjun.</li>
+    <li>📸 Spot foto di gerbang, danau flamingo dan air terjun.</li>
   </ul><div class="catatan">Mungkin ada kejutan kecil di beberapa sudut taman 😉</div>`;
 }
 function bukaInfo(papan) {
