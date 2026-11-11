@@ -36,15 +36,8 @@ window.SAFARI = {
   // Jip safari (3 mobil): harga per orang, lama 1 putaran dalam menit taman (jarak antar jip = putaran / 3),
   // lama berhenti di tiap halte dalam menit taman. 1 menit taman = 2,5 detik nyata.
   hargaJip: 10000,
-  putaranJip: 60,
+  putaranJip: 90,
   berhentiJip: 4,
-  // Shuttle malam Terminal ⇄ Air Terjun (lewat jalan utama): harga per orang, jam mulai & selesai (jam taman),
-  // lama sekali jalan (menit taman) dan lama berhenti di tiap stasiun (menit taman).
-  hargaShuttle: 10000,
-  jamMulaiShuttle: 20.75,
-  jamSelesaiShuttle: 2.5,
-  jalanShuttle: 8,
-  berhentiShuttle: 4,
   // Pakan di booth sebelah kandang: [nama, harga per porsi]
   pakanHewan: {
     kelinci: [['Wortel', 10000], ['Kangkung', 12000]],

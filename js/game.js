@@ -1302,7 +1302,6 @@ function supirJip(g) {
   for (const a of N.P.arms) swingArm(a, -1.0, 1);
 }
 const JIP = [['#e3b23c', 1], ['#6aa64e', 2], ['#e8836f', 3]].map(([w, no], i) => ({ group: buatJip(w, no), no, i, nama: 'Safari ' + no, tunda: 0, u: 0, berhenti: -1 }));
-JIP.push({ group: buatJip('#3a6fb0', 1, 'SHUTTLE'), no: 1, i: 0, nama: 'Shuttle Air Terjun', shuttle: true, tunda: 0, u: 0, berhenti: -1 });
 const jip = JIP[0];
 setTimeout(() => JIP.forEach(J => supirJip(J.group)), 0);
 
@@ -3441,20 +3440,22 @@ const LIHAT = { x: 0, y: 0, tahan: null };
 /* ---------- jip safari: jadwal ikut jam global, halte di setiap kandang ---------- */
 const PUTARAN = (D.putaranJip || 60) / 60;       // satu putaran (menit taman -> jam taman), jarak antar jip = putaran / 3
 const BERHENTI = (D.berhentiJip || 4) / 60;      // lama berhenti di tiap halte (menit taman)
+// satu rute untuk semua jip: putaran safari lalu naik jalan utama sampai Air Terjun dan kembali
+const kurvaJip = new THREE.CatmullRomCurve3([...JALUR_SAFARI, [7, 28.5], [15, 31.5], [20.6, 26], [18.3, 15], [12.3, -20], [9.3, -60], [6.3, -100], [3.3, -140], [0.4, -170], [1.2, -180.5], [0, -184], [-1.2, -180.5], [-0.4, -170], [2.7, -140], [5.7, -100], [8.7, -60], [11.7, -20], [17.7, 15], [22.4, 33]].map(p => new THREE.Vector3(p[0], 0, p[1])), true, 'catmullrom', 0.5);
 const HALTE = (() => {
-  const ids = [['terminal', 'Terminal Safari', 8, 30], ['gajah'], ['singa'], ['unta'], ['bison'], ['jerapah'], ['zebra']];
-  const L = kurvaSafari.getLength(), out = [];
+  const ids = [['terminal', 'Terminal Safari', 8, 30], ['gajah'], ['singa'], ['unta'], ['bison'], ['jerapah'], ['zebra'], ['airterjun', 'Air Terjun', 4, -178]];
+  const L = kurvaJip.getLength(), out = [];
   for (const [id, nama, zx, zz] of ids) {
     const z = ZONES.find(q => q.id === id); const cx = zx != null ? zx : z.x, cz = zz != null ? zz : z.z;
     let best = 0, bd = 1e9;
-    for (let k = 0; k < 800; k++) { const p = kurvaSafari.getPointAt(k / 800); const d = Math.hypot(p.x - cx, p.z - cz); if (d < bd) { bd = d; best = k / 800; } }
+    for (let k = 0; k < 2400; k++) { const p = kurvaJip.getPointAt(k / 2400); const d = Math.hypot(p.x - cx, p.z - cz); if (d < bd) { bd = d; best = k / 2400; } }
     out.push({ id, nama: nama || z.nama, u: best });
   }
   out.sort((a, b) => a.u - b.u);
   // halte yang terlalu berdekatan digabung jadi satu
-  for (let k = out.length - 1; k > 0; k--) if (out[k].u - out[k - 1].u < 0.05) { out[k - 1].nama = out[k - 1].nama.replace('Zona ', '') + ' & ' + out[k].nama.replace('Zona ', ''); out[k - 1].u = (out[k - 1].u + out[k].u) / 2; out.splice(k, 1); }
+  for (let k = out.length - 1; k > 0; k--) if (out[k].u - out[k - 1].u < 0.03) { out[k - 1].nama = out[k - 1].nama.replace('Zona ', '') + ' & ' + out[k].nama.replace('Zona ', ''); out[k - 1].u = (out[k - 1].u + out[k].u) / 2; out.splice(k, 1); }
   out.forEach(h => {
-    const p = kurvaSafari.getPointAt(h.u), tg = kurvaSafari.getTangentAt(h.u);
+    const p = kurvaJip.getPointAt(h.u), tg = kurvaJip.getTangentAt(h.u);
     h.x = p.x - tg.z * 5.2; h.z = p.z + tg.x * 5.2; h.naikX = p.x - tg.z * 3.4; h.naikZ = p.z + tg.x * 3.4;
     buatHalte(h, tg, '🚙 HALTE ' + h.nama.replace('Zona ', '').toUpperCase(), '#2f5d3a', '🚙 Jadwal jip');
   });
@@ -3468,44 +3469,18 @@ function buatHalte(h, tg, teks, warna, label) {
   const papan = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 0.55), new THREE.MeshLambertMaterial({ map: textTex([teks], { w: 640, h: 126, size: 52, bg: warna, border: '#f2d14b' }) }));
   papan.position.set(0, 2.2, 0.82); g.add(papan); const pb = papan.clone(); pb.rotation.y = Math.PI; pb.position.z = -0.82; g.add(pb);
   const it = addInteract(g, 'halte', h, 5); it.label = label;
+  { // bangku halte bisa diduduki (menghadap jalan)
+    const ry = g.rotation.y, bx = h.x - Math.sin(ry) * 0.3, bz = h.z - Math.cos(ry) * 0.3;
+    const o = new THREE.Object3D(); o.position.set(bx, 0.6, bz); o.rotation.y = ry; scene.add(o);
+    o.add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 0.6), new THREE.MeshBasicMaterial({ visible: false })));
+    const ib = addInteract(o, 'bangku', { x: bx, z: bz, yaw: ry + Math.PI, h: 0.06 }, 1.5); ib.label = '🪑 Duduk di bangku halte'; ib.utama = 1.2;
+  }
 }
-const RUTE_SAFARI = { kurva: kurvaSafari, halte: HALTE, status: (J, jam) => statusJip(J, jam), harga: () => hargaJip(), ikon: '🚙' };
+const RUTE_SAFARI = { kurva: kurvaJip, halte: HALTE, status: (J, jam) => statusJip(J, jam), harga: () => hargaJip(), ikon: '🚙' };
 HALTE.forEach(h => h.rute = RUTE_SAFARI);
-// ---- shuttle malam: Terminal ⇄ Air Terjun lewat jalan utama, bolak-balik ----
-const RUTE_SHUTTLE = (() => {
-  const kurva = new THREE.CatmullRomCurve3(JALAN_UTAMA.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'catmullrom', 0.5);
-  const cari = (z) => { let best = 0, bd = 1e9; for (let k = 0; k <= 1000; k++) { const d = Math.abs(kurva.getPointAt(k / 1000).z - z); if (d < bd) { bd = d; best = k / 1000; } } return best; };
-  const uA = cari(24), uB = cari(-180.5);
-  const R = { kurva, uA, uB, ikon: '🚌', harga: () => D.hargaShuttle != null ? D.hargaShuttle : 10000,
-    mulai: D.jamMulaiShuttle != null ? D.jamMulaiShuttle : 20.75, selesai: D.jamSelesaiShuttle != null ? D.jamSelesaiShuttle : 2.5,
-    jalan: (D.jalanShuttle || 8) / 60, stop: (D.berhentiShuttle || 4) / 60 };
-  R.T = 2 * (R.jalan + R.stop);
-  R.N = Math.max(1, Math.round((((R.selesai - R.mulai) % 24) + 24) % 24 / R.T));   // jumlah pulang-pergi per malam
-  R.halte = [['Stasiun Terminal', 0], ['Stasiun Air Terjun', 1]].map(([nama, v]) => {
-    const u = lerp(uA, uB, v), p = kurva.getPointAt(u), tg = kurva.getTangentAt(u);
-    const h = { id: 'shuttle' + v, nama, u: v, rute: R, x: p.x - tg.z * 5.2, z: p.z + tg.x * 5.2, naikX: p.x - tg.z * 3.4, naikZ: p.z + tg.x * 3.4 };
-    buatHalte(h, tg, '🚌 ' + nama.toUpperCase(), '#2f4f7a', '🚌 Jadwal shuttle');
-    return h;
-  });
-  R.jamTeks = () => jamTeks(R.mulai + R.stop) + '–' + jamTeks((R.mulai + R.N * R.T) % 24);
-  R.status = (J, jam) => {
-    let ph = (((jam - J.tunda - R.mulai) % 24) + 24) % 24;
-    if (ph >= R.N * R.T) return { u: 0, berhenti: 0, sisa: 1, tutup: true, yaw: 0 };
-    ph %= R.T;
-    const e = (x) => { const v = clamp(x / 0.4, 0, 1); return v * v * (3 - 2 * v); };
-    if (ph < R.stop) return { u: 0, berhenti: 0, sisa: R.stop - ph, yaw: Math.PI * (1 - e(ph / R.stop)) };
-    ph -= R.stop;
-    if (ph < R.jalan) return { u: ph / R.jalan, berhenti: -1, yaw: 0, arah: 1 };
-    ph -= R.jalan;
-    if (ph < R.stop) return { u: 1, berhenti: 1, sisa: R.stop - ph, yaw: Math.PI * e(ph / R.stop) };
-    ph -= R.stop;
-    return { u: 1 - ph / R.jalan, berhenti: -1, yaw: Math.PI, arah: -1 };
-  };
-  return R;
-})();
-for (const J of JIP) J.rute = J.shuttle ? RUTE_SHUTTLE : RUTE_SAFARI;
-const titikRute = (R, u) => R === RUTE_SAFARI ? kurvaSafari.getPointAt(((u % 1) + 1) % 1) : R.kurva.getPointAt(clamp(lerp(R.uA, R.uB, u), 0, 1));
-const arahRute = (R, u) => R === RUTE_SAFARI ? kurvaSafari.getTangentAt(((u % 1) + 1) % 1) : R.kurva.getTangentAt(clamp(lerp(R.uA, R.uB, u), 0, 1));
+for (const J of JIP) J.rute = RUTE_SAFARI;
+const titikRute = (R, u) => kurvaJip.getPointAt(((u % 1) + 1) % 1);
+const arahRute = (R, u) => kurvaJip.getTangentAt(((u % 1) + 1) % 1);
 // timeline satu putaran: jalan antar halte lalu berhenti sebentar di tiap halte
 function statusJip(J, jam) {
   const T = PUTARAN, jalan = T - HALTE.length * BERHENTI;
@@ -3534,7 +3509,7 @@ function updateJip(dt) {
   for (const J of JIP) {
     const R = J.rute, st = R.status(J, jam);
     if (st.berhenti < 0 && NAIK?.J !== J) {
-      const ahead = R === RUTE_SAFARI ? titikRute(R, st.u + 0.008) : titikRute(R, st.u + st.arah * 0.025);
+      const ahead = R === RUTE_SAFARI ? titikRute(R, st.u + 0.005) : titikRute(R, st.u + st.arah * 0.025);
       const blok = Math.hypot(ahead.x - player.x, ahead.z - player.z) < 5 || Math.hypot(ahead.x - partner.x, ahead.z - partner.z) < 5;
       if (blok) J.tunda += dGame; else if (J.tunda > 0) J.tunda = Math.max(0, J.tunda - dGame * 0.5);
     }
@@ -3603,13 +3578,6 @@ function turunJip() {
 }
 $('btn-jip').onclick = () => { if (NAIK) turunJip(); else { const J = JIP[+$('btn-jip').dataset.j]; if (J) naikJip(J); } };
 function bukaJadwal(h) {
-  if (h.rute === RUTE_SHUTTLE) {
-    const R = RUTE_SHUTTLE, k = R.halte.indexOf(h), J = JIP.find(j => j.shuttle);
-    const w = J.berhenti === k && !J.tutup ? 0 : tibaBerikut(J, k), menit = w == null ? null : Math.round(w / 24 * WAKTU.menitHari);
-    const info = J.berhenti === k && !J.tutup ? '<b>Shuttle sedang berhenti di sini.</b> Ketuk tombol naik.' : (w == null ? 'Belum ada jadwal.' : (J.tutup ? 'Shuttle pertama' : 'Shuttle berikutnya') + ` tiba jam <b>${jamTeks((WAKTU.jam + w) % 24)}</b>` + (menit <= 15 ? ` (± ${Math.max(1, menit)} menit lagi)` : '') + '.');
-    kartu('🚌', h.nama, `<p>${info}</p><div class="catatan">Shuttle malam Terminal ⇄ Air Terjun, jalan jam ${R.jamTeks()} mengikuti jam buka air terjun. ${fmtRp(R.harga())} per orang.</div>`);
-    return;
-  }
   const k = HALTE.indexOf(h);
   const baris = JIP.filter(J => !J.shuttle).map(J => { const w = tibaBerikut(J, k); if (w == null) return ''; const menit = Math.max(0, Math.round(w / 24 * WAKTU.menitHari)); return `<li>🚙 Safari ${J.no}: ${J.berhenti === k ? '<b>sedang berhenti di sini</b>' : (menit < 1 ? 'kurang dari 1 menit lagi' : '± ' + menit + ' menit lagi') + ` (jam ${jamTeks((WAKTU.jam + w) % 24)})`}</li>`; }).join('');
   kartu('🚙', 'Halte ' + h.nama.replace('Zona ', ''), `<ul>${baris}</ul><div class="catatan">Naik jip ${fmtRp(hargaJip())} per orang. Tunggu di halte, tombol naik muncul saat jip berhenti. Kalian bisa turun di halte mana saja.</div>`);
@@ -3832,7 +3800,7 @@ function update(dt, t) {
     if (it.kind === 'pasangan') continue;
     it.obj.getWorldPosition(tmpA);
     const d = Math.hypot(tmpA.x - player.x, tmpA.z - player.z);
-    if (d < it.radius && d < nd) { nd = d; nearest = it; }
+    if (d < it.radius && d - (it.utama || 0) < nd) { nd = d - (it.utama || 0); nearest = it; }
   }
   if (nearest && started && !paused && !duduk && !antriPemain && !AMATI.aktif) {
     const nm = nearest.label ? '' : nearest.kind === 'hewan' ? INFO[nearest.data].nama : nearest.kind === 'papan' ? (nearest.data === 'peta' ? 'Peta' : (ZONES.find(z => z.id === nearest.data) || {}).nama) : LANDMARK[nearest.data].nama;
@@ -5016,7 +4984,7 @@ function updateLamaran(dt, t) {
 putar.push(updateLamaran);
 
 /* ================================================================== papan informasi: peta, jam buka, jadwal jip & shuttle, harga, acara */
-const PAPAN_INFO = [[39, 78, 0, 'Gerbang'], [11, 24, 0, 'Terminal Safari'], [62, 86, 0, 'Food Court & Bioskop'], [26.9, 83.5, -1.57, 'Taman Bermain'], [8.8, -176, -0.4, 'Stasiun Air Terjun'],
+const PAPAN_INFO = [[39, 78, 0, 'Gerbang'], [11, 24, 0, 'Terminal Safari'], [62, 86, 0, 'Food Court & Bioskop'], [26.9, 83.5, -1.57, 'Taman Bermain'], [8.8, -176, -0.4, 'Halte Air Terjun'],
   [40, 101, 3.14, 'Parkir'], [37, 22, -1.2, 'Kebun Binatang Mini'], [18, -28, -1.4, 'Area Rekreasi'], [15.5, -56, -1.4, 'Taman Burung & Harimau'], [13, -88, -1.4, 'Beruang Madu'],
   [10, -122, -1.4, 'Panda & Perkemahan'], [-27, 52, 0.4, 'Halte Gajah & Singa'], [-30, -36, 2.4, 'Halte Jerapah & Zebra']].map(([x0, z0, rot, nama]) => {
   const pp = { x: x0, z: z0 }; resolve(pp, 1.6); const x = pp.x, z = pp.z;   // jangan menimpa pohon / pagar
@@ -5027,7 +4995,7 @@ const PAPAN_INFO = [[39, 78, 0, 'Gerbang'], [11, 24, 0, 'Terminal Safari'], [62,
     c.fillStyle = '#f6efdc'; c.fillRect(0, 0, w, h); c.fillStyle = '#2f5d3a'; c.fillRect(0, 0, w, 74);
     c.fillStyle = '#fff'; c.font = '700 44px Fredoka, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('📋 PAPAN INFORMASI', w / 2, 38);
     c.fillStyle = '#3a2e22'; c.font = '600 30px Fredoka, system-ui, sans-serif'; c.textAlign = 'left';
-    ['🗺️ Peta & kamu di sini', '🕘 Jam buka tempat', '🚙 Jadwal jip safari & 🚌 shuttle', '🎟️ Harga · 🎆 Acara malam'].forEach((s, i) => c.fillText(s, 24, 108 + i * 50));
+    ['🗺️ Peta & kamu di sini', '🕘 Jam buka tempat', '🚙 Jadwal jip keliling', '🎟️ Harga · 🎆 Acara malam'].forEach((s, i) => c.fillText(s, 24, 108 + i * 50));
     c.strokeStyle = '#2f5d3a'; c.lineWidth = 10; c.strokeRect(5, 5, w - 10, h - 10);
   });
   const papan = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.7, 0.1), [mat('#4a3d30'), mat('#4a3d30'), mat('#4a3d30'), mat('#4a3d30'), new THREE.MeshLambertMaterial({ map: tx, emissive: '#222' }), new THREE.MeshLambertMaterial({ map: tx, emissive: '#222' })]);
@@ -5046,14 +5014,13 @@ function infoIsi(tab, papan) {
       <ul style="margin-top:10px"><li>Jalur safari (jip) di sebelah barat: gajah, singa, unta, bison, jerapah, zebra.</li><li>Food court, bioskop dan taman bermain dekat gerbang.</li><li>Kebun binatang mini, rekreasi, taman burung, harimau di sebelah timur.</li><li>Air terjun paling utara, buka malam.</li></ul>`;
   }
   if (tab === 'jam') {
-    const at = atBuka(), R = RUTE_SHUTTLE;
+    const at = atBuka();
     const baris = [
       ['🦁 Taman & kandang hewan', 'Buka setiap saat'],
-      ['🚙 Jip safari', 'Setiap saat, tiap ± ' + Math.round((D.putaranJip || 60) / 3) + ' menit'],
+      ['🚙 Jip (keliling safari sampai Air Terjun)', 'Setiap saat, tiap ± ' + Math.round((D.putaranJip || 60) / 3) + ' menit'],
       ['🍜 Food court & 🎬 bioskop', 'Buka setiap saat'],
       ['🎡 Taman bermain', 'Buka setiap saat'],
       ['💦 Air terjun', jamBukaTeks() + (at ? ' · <b style="color:#2f7d3a">sedang buka</b>' : ' · <b style="color:#b33">tutup</b>')],
-      ['🚌 Shuttle air terjun', R.jamTeks()],
       ['💰 Uang jajan kembali penuh', 'Jam ' + String(DOMPET.jamReset).padStart(2, '0') + '.00'],
       ['👥 Paling ramai', 'Sekitar 09.00 dan 13.30']
     ];
@@ -5068,23 +5035,13 @@ function infoIsi(tab, papan) {
       return `<tr><td style="padding:6px 4px;border-bottom:1px solid #e6dcc6">🚏 ${escH(h.nama.replace('Zona ', ''))}</td><td style="padding:6px 4px;border-bottom:1px solid #e6dcc6;text-align:right">${ket}</td></tr>`;
     }).join('');
     return `<p>Jip berikutnya di tiap halte (sekarang ${jamTeks(j)}):</p><table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
-      <div class="catatan">3 jip berkeliling terus. Satu putaran ${D.putaranJip || 60} menit taman, berhenti ${D.berhentiJip || 4} menit di tiap halte. ${rp(hargaJip())} per orang, turun di halte mana saja.</div>`;
-  }
-  if (tab === 'shuttle') {
-    const R = RUTE_SHUTTLE, S = JIP.find(J => J.shuttle);
-    const rows = R.halte.map((h, k) => {
-      const w = S.berhenti === k && !S.tutup ? 0 : tibaBerikut(S, k);
-      const ket = w == null ? '-' : w === 0 ? '<b>Shuttle ada di sini</b>' : jamPas(j + w);
-      return `<tr><td style="padding:6px 4px;border-bottom:1px solid #e6dcc6">🚌 ${h.nama}</td><td style="padding:6px 4px;border-bottom:1px solid #e6dcc6;text-align:right">${ket}</td></tr>`;
-    }).join('');
-    return `<p>Shuttle malam Terminal ⇄ Air Terjun lewat jalan utama.</p><table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
-      <div class="catatan">Jalan jam ${R.jamTeks()} mengikuti jam buka air terjun. Sekali jalan ± ${D.jalanShuttle || 8} menit taman. ${rp(R.harga())} per orang.${S.tutup ? ' Sekarang shuttle masih parkir di Terminal.' : ''}</div>`;
+      <div class="catatan">3 jip berkeliling terus lewat zona safari sampai Air Terjun. Satu putaran ${D.putaranJip || 60} menit taman, berhenti ${D.berhentiJip || 4} menit di tiap halte. ${rp(hargaJip())} per orang, turun di halte mana saja.</div>`;
   }
   if (tab === 'harga') {
     const W = D.hargaWahana || {}, pakan = Object.values(D.pakanHewan || {}).flat().map(p => p[1]);
     const baris = [
       ['🎟️ Tiket masuk', rp(D.tiketMasuk != null ? D.tiketMasuk : 15000)],
-      ['🚙 Jip safari', rp(hargaJip())], ['🚌 Shuttle air terjun', rp(RUTE_SHUTTLE.harga())],
+      ['🚙 Jip safari', rp(hargaJip())],
       ['🎬 Tiket bioskop', rp(D.tiketBioskop != null ? D.tiketBioskop : 20000)], ['🍿 Popcorn', rp(D.hargaPopcorn || 25000)], ['🥤 Minum bioskop', rp(D.hargaMinumBioskop || 15000)],
       ['🎢 Taman bermain (tiket terusan, semua wahana)', rp(hargaTB())],
       ['🥕 Pakan hewan', pakan.length ? 'mulai ' + rp(Math.min(...pakan)) : '-'], ['🍜 Makanan food court', 'mulai ' + rp(D.hargaMakananMin || 15000)]
@@ -5097,13 +5054,13 @@ function infoIsi(tab, papan) {
   return `<ul>
     <li>🌙 <b>${jamBukaTeks()}</b> · Air terjun buka. Kunang-kunang menari di depan air terjun.</li>
     <li>🎆 <b>00.00</b> · Kembang api dari puncak air terjun.${malam && j >= 21 ? ' <b style="color:#b33">Malam ini!</b>' : ''}</li>
-    <li>🚌 <b>${RUTE_SHUTTLE.jamTeks()}</b> · Shuttle malam dari Terminal ke air terjun.</li>
+    <li>🚙 Setiap saat · Jip keliling dari Terminal, zona safari, sampai Air Terjun. Turun di halte mana saja.</li>
     <li>🦒 Siang hari · Beri makan jerapah, gajah, zebra, unta, bison dan kelinci di booth pakan.</li>
     <li>📸 Spot foto di gerbang, area rekreasi dan air terjun.</li>
   </ul><div class="catatan">Mungkin ada kejutan kecil di beberapa sudut taman 😉</div>`;
 }
 function bukaInfo(papan) {
-  const tabs = [['peta', '🗺️ Peta'], ['jam', '🕘 Jam buka'], ['jip', '🚙 Jip'], ['shuttle', '🚌 Shuttle'], ['harga', '🎟️ Harga'], ['acara', '🎆 Acara']];
+  const tabs = [['peta', '🗺️ Peta'], ['jam', '🕘 Jam buka'], ['jip', '🚙 Jip'], ['harga', '🎟️ Harga'], ['acara', '🎆 Acara']];
   const tampil = () => {
     $('k-isi').innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${tabs.map(([k, l]) => `<button class="info-tab" data-t="${k}" style="flex:1 0 30%;padding:8px 4px;border:0;border-radius:10px;font:inherit;font-size:13px;${k === INFO_TAB.aktif ? 'background:#2f5d3a;color:#fff' : 'background:#ece3cf;color:#3a2e22'}">${l}</button>`).join('')}</div><div>${infoIsi(INFO_TAB.aktif, papan)}</div>`;
   };
@@ -5120,4 +5077,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSemprot(dt); updateS
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
