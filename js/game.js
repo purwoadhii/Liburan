@@ -13,7 +13,12 @@ let seed = 7; const srand = () => { seed = (seed * 16807) % 2147483647; return (
 const canvas = $('layar');
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  // beberapa browser menolak pilihan tertentu (misalnya setelah kartu grafis sibuk): coba lagi dengan pilihan yang lebih sederhana
+  let galatGL = null;
+  for (const o of [{ antialias: true, powerPreference: 'high-performance' }, { antialias: true }, { antialias: false, powerPreference: 'low-power' }]) {
+    try { renderer = new THREE.WebGLRenderer({ canvas, ...o }); break; } catch (e) { galatGL = e; }
+  }
+  if (!renderer) throw galatGL;
 } catch (e) {
   $('mulai').classList.add('sembunyi'); $('galat').classList.remove('sembunyi');
   throw e;
