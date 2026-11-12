@@ -987,7 +987,7 @@ const _q = new THREE.Quaternion();
   W.sudut = 0;
   putar.push(() => { const f = W.fase(); W.sudut = W.amp(f) * Math.sin((f - 8) * 1.45); ay.rotation.z = W.sudut; });
   addCircle(W.x - 2.3, W.z, 1.9); addCircle(W.x + 2.3, W.z, 1.9); addCircle(W.x, W.z, 1.9);
-  W.pintu = [W.x, W.z - 3.4];
+  W.pintu = [W.x, W.z - 3.4]; W.badan = ay; W.LEN = LEN;
   W.bisaNaik = () => { const f = W.fase(); return f < 6 || f > 53; };
   W.naik = () => { W.sudahNaik = false; };
   W.kursi = (out) => {
@@ -1368,6 +1368,36 @@ function supirJip(g) {
 }
 const JIP = [['#e3b23c', 1], ['#6aa64e', 2], ['#e8836f', 3]].map(([w, no], i) => ({ group: buatJip(w, no), no, i, nama: 'Safari ' + no, tunda: 0, u: 0, berhenti: -1 }));
 const jip = JIP[0];
+// penumpang lain di wahana supaya taman bermain terasa ramai (hanya digambar saat kalian di dekat taman bermain)
+const PENUMPANG_W = [];
+setTimeout(() => {
+  const taruh = (induk, x, Y, z, rotY, info = {}) => {
+    const N = buatNpc([0, 0]); npcs.splice(npcs.indexOf(N), 1); scene.remove(N.P.group); induk.add(N.P.group);
+    N.P.group.position.set(x, Y + 0.06 - N.P.hip, z); N.P.group.rotation.y = rotY;
+    for (const l of N.P.legs) l.rotation.x = info.kaki != null ? info.kaki : -1.45;
+    for (const a of N.P.arms) swingArm(a, info.angkat ? -2.7 : -0.9, 1);
+    PENUMPANG_W.push({ g: N.P.group, arms: N.P.arms, ...info });
+  };
+  const B = WAHANA.bianglala; for (const i of [1, 3, 4, 6, 8]) { const gd = B.gondola[i]; taruh(gd.g, -0.32, -1.74, -0.45, 0, { gondola: gd }); if (i % 3 !== 1) taruh(gd.g, 0.32, -1.74, -0.45, 0, { gondola: gd }); }
+  const K = WAHANA.komidi; for (const i of [3, 5, 6]) taruh(K.kuda[i], 0, 0.83, -0.05, 0, { kaki: -0.5 });
+  const H = WAHANA.histeria; for (const i of [3, 4, 7]) taruh(H.kursiList[i], 0, -0.05, 0, 0, { teriak: H });
+  const O = WAHANA.ontang; for (const i of [4, 5, 8, 10]) taruh(O.kursiList[i], 0, 0.1, 0, 0);
+  const Kr = WAHANA.kora; for (const [x, z] of [[-2.5, -0.32], [-2.5, 0.32], [1.7, -0.32], [-1.7, 0.32]]) taruh(Kr.badan, x, -Kr.LEN + 0.72, z, x < 0 ? Math.PI / 2 : -Math.PI / 2, { teriak: Kr });
+  const C = WAHANA.cangkir; for (const i of [2, 3]) for (const x of [0.27, -0.27]) taruh(C.cangkir[i], x, 0.42, -0.28, 0);
+  const R = WAHANA.roller; for (const i of [1, 2]) if (R.gerbong[i]) for (const x of [0.3, -0.3]) taruh(R.gerbong[i], x, 0.42, -0.15, 0, { teriak: R });
+  let tCek = 0;
+  putar.push((dt) => {
+    tCek -= dt; if (tCek > 0) return; tCek = 0.25;
+    const dekat = Math.hypot(player.x - 5, player.z - 82) < 75;
+    for (const q of PENUMPANG_W) {
+      q.g.visible = dekat && !(q.gondola && NAIK_W && NAIK_W.W === B && B.pakai === q.gondola);
+      if (!dekat || !q.teriak) continue;
+      // angkat tangan saat seru: histeria jatuh, kora-kora di puncak ayunan, roller coaster melaju
+      const W = q.teriak, seru = W === H ? (W.fase() > 21 && W.fase() < 30) : W === Kr ? Math.abs(W.sudut) > 0.45 : (W.status === 'jalan' && W.u > W.uTop);
+      if (seru !== q.seru) { q.seru = seru; for (const a of q.arms) swingArm(a, seru ? -2.7 : -0.9, 1); }
+    }
+  });
+}, 0);
 setTimeout(() => JIP.forEach(J => supirJip(J.group)), 0);
 
 /* ------------------------------------------------------------------ food court & bioskop */
