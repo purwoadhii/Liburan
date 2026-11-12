@@ -1632,6 +1632,28 @@ const BIOS = { x1: 64, z1: 56, x2: 86, z2: 80, kursi: [], film: null, video: nul
     nm.position.set(70.85, 0.75 + h, z + 0.47); scene.add(nm);
   });
   scene.add(dudukan, sandaran);
+  // lampu kecil di bawah bangku (menyala saat credit film) dan cahaya dari layar
+  {
+    const mStrip = new THREE.MeshBasicMaterial({ color: '#ffd98a', transparent: true, opacity: 0 });
+    const mSinar = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      map: tex(64, 64, (c, w, h) => { const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); g.addColorStop(0, 'rgba(255,214,140,1)'); g.addColorStop(1, 'rgba(255,200,120,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h); }) });
+    const strip = new THREE.InstancedMesh(box(0.9, 0.04, 0.05), mStrip, n), sinar = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.5, 1.3), mSinar, n + rows.length * 2);
+    const ujung = new THREE.InstancedMesh(box(0.06, 0.16, 0.6), mStrip, rows.length * 4);
+    const o3 = new THREE.Object3D();
+    BIOS.kursi.forEach((k, j) => {
+      o3.rotation.set(0, 0, 0); o3.position.set(k.x, k.h + 0.05, k.z - 0.38); o3.updateMatrix(); strip.setMatrixAt(j, o3.matrix);
+      o3.rotation.set(-Math.PI / 2, 0, 0); o3.position.set(k.x, k.h + 0.015, k.z - 0.62); o3.updateMatrix(); sinar.setMatrixAt(j, o3.matrix);
+    });
+    // lampu di ujung bangku yang menghadap lorong + cahaya di lantai lorong
+    rows.forEach((z, r) => {
+      const h = +((11 - r) * 0.12).toFixed(2);
+      [70.98, 74.62, 77.58, 81.22].forEach((x, q) => { o3.rotation.set(0, 0, 0); o3.scale.set(1, 1, 1); o3.position.set(x, h + 0.14, z); o3.updateMatrix(); ujung.setMatrixAt(r * 4 + q, o3.matrix); });
+      [[76.1, 3.2], [69.9, 2.4]].forEach(([x, w], q) => { o3.rotation.set(-Math.PI / 2, 0, 0); o3.scale.set(w / 1.5, 1.2, 1); o3.position.set(x, h + 0.02, z - 0.1); o3.updateMatrix(); sinar.setMatrixAt(n + r * 2 + q, o3.matrix); });
+    });
+    strip.visible = sinar.visible = ujung.visible = false; strip.frustumCulled = sinar.frustumCulled = ujung.frustumCulled = false; scene.add(strip, sinar, ujung);
+    BIOS.lampuKursi = { strip, sinar, ujung, mStrip, mSinar, nyala: 0 };
+    BIOS.sinarLayar = new THREE.PointLight('#dfe6ff', 0, 34, 1.2); BIOS.sinarLayar.position.set(76, 4.6, 59.5); scene.add(BIOS.sinarLayar);
+  }
   for (const z of rows) addSeg(70.9, z + 0.5, 81.3, z + 0.5);
   BIOS.rows = rows; BIOS.xs = xs;
   // loket di depan
@@ -1903,7 +1925,7 @@ function updateWaktu(dt, dalam) {
   updateLampu(dt || 0.016, dalam ? 0 : clamp(1.15 - w.terang * 2.2, 0, 1));
   for (const m of lampuGedung) m.emissiveIntensity = clamp(1.2 - w.terang, 0.2, 1);
   // cahaya: di dalam gedung tetap terang karena lampu
-  const gelapBios = dalam && dalam.id === 'bioskop' ? (BIOS.status === 'putar' ? 1 : 0.35) : 0;
+  const gelapBios = dalam && dalam.id === 'bioskop' ? (BIOS.status === 'putar' ? 1 : BIOS.status === 'credit' ? 1 - 0.13 * BIOS.lampuKursi.nyala : 0.35) : 0;
   let hT = 0.35 + 1.25 * w.terang, sT = 2.2 * w.terang + 0.15;
   if (dalam) { hT = Math.max(hT, 1.35); sT = Math.min(sT, 0.6); }
   if (gelapBios) { hT = 1.6 - gelapBios * 1.35; sT = 0.2 * (1 - gelapBios); }
@@ -2445,7 +2467,7 @@ function mulaiFilm(f, pilih) {
     v.play().then(() => v.pause()).catch(() => {});
     const vt = new THREE.VideoTexture(v); vt.colorSpace = THREE.SRGBColorSpace;
     BIOS.vt = vt;
-    v.onended = () => keluarBioskop();
+    v.onended = () => mulaiCredit();
   } else BIOS.yt = yt;
   BIOS.layarMat.map = textTex([f.judul, 'Segera dimulai…'], { w: 1024, h: 440, size: 72, size2: 48, bg: '#1d1d26', border: '#1d1d26' }); BIOS.layarMat.needsUpdate = true;
   // kursi sesuai tiket: berjalan dulu mencari kursinya, cewek masuk duluan ke kursi yang lebih dalam
@@ -2528,7 +2550,7 @@ function keluarBioskop() {
   if (!(duduk && duduk.bioskop)) { selesaiFilm(); return; }
   const [kG, kB] = BIOS.kursiKita || [{ x: duduk.a[0], z: duduk.a[1], h: duduk.h || 0 }, { x: duduk.b[0], z: duduk.b[1], h: duduk.hb != null ? duduk.hb : (duduk.h || 0) }];
   const keluar = (k, ujung) => { const J = jalurKursi(k, true); return { jalur: J.jalur.slice(1).reverse().slice(1).concat([[67.3, 81.5], ujung]), h: J.h }; };
-  const selesai = BIOS.status === 'putar';
+  const selesai = BIOS.status === 'putar' || BIOS.status === 'credit';
   // satu film = 2 jam taman: setelah keluar, jam sudah lewat 2 jam dari saat masuk
   if (selesai && BIOS.jamMasuk != null && jamAbs() < BIOS.jamMasuk + 2) { WAKTU.geser += BIOS.jamMasuk + 2 - jamAbs(); setTimeout(() => hint('Sudah jam ' + jamTeks(WAKTU.jam) + '. Dua jam berlalu selama nonton 🎬', 3500), 3200); }
   BIOS.jamMasuk = null;
@@ -2545,8 +2567,47 @@ function keluarBioskop() {
     }
   };
 }
+// film habis: bioskop gelap, credit film diputar di layar (cahaya hanya dari layar), lalu lampu kecil di bawah bangku menyala.
+// Tidak keluar otomatis: ada tombol Exit.
+function mulaiCredit() {
+  const f = BIOS.film, v = BIOS.video;
+  if (!f || !(duduk && duduk.bioskop)) { keluarBioskop(); return; }
+  BIOS.status = 'credit'; BIOS.creditT = 0; BIOS.creditHabis = false;
+  // kembali ke ruang bioskop (kalau tadi nonton layar penuh)
+  if (v) $('film-simpan').appendChild(v);
+  $('yt').classList.add('sembunyi'); $('film-3d').classList.add('sembunyi'); $('btn-putar').classList.add('sembunyi'); $('btn-layar').classList.add('sembunyi');
+  const habis = () => { BIOS.creditHabis = true; BIOS.layarVid.visible = false; BIOS.layarMat.map = textTex([' ', ' '], { w: 64, h: 32, size: 10, size2: 10, bg: '#000000', border: '#000000' }); BIOS.layarMat.needsUpdate = true; hint('Tekan 🚪 Exit untuk keluar dari bioskop.', 4000); };
+  (BIOS.introT || []).forEach(clearTimeout); BIOS.introT = []; $('intro').classList.add('sembunyi'); $('yt').classList.remove('intro');
+  if (v && f.credit) {
+    const LV = BIOS.layarVid; LV.visible = false; v.controls = false;
+    BIOS.layarMat.map = textTex([' ', ' '], { w: 64, h: 32, size: 10, size2: 10, bg: '#000000', border: '#000000' }); BIOS.layarMat.needsUpdate = true;
+    v.onended = habis; v.onerror = habis;
+    v.addEventListener('loadedmetadata', () => { const a = v.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : 16 / 9, W = 18, H = 7.6; if (a < W / H) LV.scale.set(H * a, H, 1); else LV.scale.set(W, W / a, 1); LV.visible = true; }, { once: true });
+    v.src = f.credit; v.load(); v.play().catch(() => { $('btn-putar').textContent = '▶'; $('btn-putar').classList.remove('sembunyi'); hint('Ketuk ▶ untuk memutar credit film.', 3000); });
+  } else {
+    if (v) { v.onended = null; v.pause(); }
+    BIOS.layarVid.visible = false;
+    BIOS.layarMat.map = textTex([f.judul, 'Terima kasih sudah menonton'], { w: 1024, h: 440, size: 72, size2: 44, bg: '#000000', border: '#000000', fg: '#e8e8e8' }); BIOS.layarMat.needsUpdate = true;
+  }
+  $('btn-berdiri').textContent = '🚪 Exit'; tampilBerdiri(true);
+}
+function penontonPulang() {
+  for (const N of BIOS.penonton) { N.duduk = false; N.jalur = [[N.kursi.x, N.kursi.z - 0.66], [68.6, N.kursi.z - 0.66], [68.6, 78], [67.3, 78], [67.3, 84], [rand(50, 75), 88]]; N.pergi = true; N.tunda = rand(0, 6); }
+  BIOS.penonton = [];
+}
+function updateCredit(dt, t) {
+  const L = BIOS.lampuKursi, cr = BIOS.status === 'credit';
+  if (cr) { BIOS.creditT += dt; if (BIOS.creditT > 5 && BIOS.penonton.length) penontonPulang(); }
+  L.nyala = clamp(L.nyala + (cr && BIOS.creditT > 5 ? dt / 2.5 : -dt * 2), 0, 1);
+  L.strip.visible = L.sinar.visible = L.ujung.visible = L.nyala > 0.01; L.mStrip.opacity = L.nyala; L.mSinar.opacity = L.nyala * 0.75;
+  // cahaya layar: film/credit yang sedang tampil menerangi ruangan dengan sedikit kedipan
+  const tampil = (BIOS.status === 'putar' && BIOS.layarVid.visible) || (cr && !BIOS.creditHabis);
+  const mau = tampil ? (cr && !BIOS.layarVid.visible ? 2.2 : 5 + Math.sin(t * 7.3) * 0.6 + Math.sin(t * 2.1) * 0.8) : 0;
+  BIOS.sinarLayar.intensity = lerp(BIOS.sinarLayar.intensity, mau, Math.min(1, dt * 3));
+}
 function selesaiFilm(diam) {
-  if (BIOS.video) { BIOS.video.pause(); BIOS.video.removeAttribute('src'); BIOS.video.load(); BIOS.video = null; }
+  $('btn-berdiri').textContent = 'Berdiri';
+  if (BIOS.video) { BIOS.video.onended = BIOS.video.onerror = null; BIOS.video.pause(); BIOS.video.removeAttribute('src'); BIOS.video.load(); BIOS.video = null; }
   if (BIOS.vt) { BIOS.vt.dispose(); BIOS.vt = null; }
   if (BIOS.layarVid) { BIOS.layarVid.visible = false; BIOS.layarVid.material.map = null; }
   BIOS.yt = null; $('yt-frame').src = 'about:blank'; $('yt').classList.add('sembunyi');
@@ -2554,8 +2615,7 @@ function selesaiFilm(diam) {
   $('btn-putar').classList.add('sembunyi'); $('btn-layar').classList.add('sembunyi'); $('film-3d').classList.add('sembunyi');
   BIOS.status = 'kosong'; BIOS.film = null;
   BIOS.layarMat.map = textTex(['Pilih film di loket', '🎬'], { w: 1024, h: 440, size: 80, size2: 120, bg: '#1d1d26', border: '#1d1d26' }); BIOS.layarMat.needsUpdate = true;
-  for (const N of BIOS.penonton) { N.duduk = false; N.jalur = [[N.kursi.x, N.kursi.z - 0.66], [68.6, N.kursi.z - 0.66], [68.6, 78], [67.3, 78], [67.3, 84], [rand(50, 75), 88]]; N.pergi = true; N.tunda = rand(0, 3); }
-  BIOS.penonton = [];
+  penontonPulang();
   BIOS.kursi.forEach(k => k.terisi = false);
 }
 
@@ -2563,8 +2623,9 @@ function selesaiFilm(diam) {
 let cullT = 0;
 function updateGedung(dt, t, dalam) {
   // redupkan lampu saat film diputar
-  const gelap = dalam && dalam.id === 'bioskop' && BIOS.status === 'putar' ? 1 : (dalam && dalam.id === 'bioskop' ? 0.35 : 0);
+  const gelap = dalam && dalam.id === 'bioskop' && (BIOS.status === 'putar' || BIOS.status === 'credit') ? 1 : (dalam && dalam.id === 'bioskop' ? 0.35 : 0);
 
+  updateCredit(dt, t);
   if (BIOS.status === 'masuk') { if (!(duduk && duduk.bioskop)) BIOS.timer = Math.max(BIOS.timer, 4); BIOS.timer -= dt; if (BIOS.timer <= 0 || (BIOS.timer < 14 && BIOS.penonton.every(n => n.duduk))) putarFilm(); }
   // penonton & pengunjung
   for (let i = npcs.length - 1; i >= 0; i--) {
@@ -5377,4 +5438,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSine(dt); updateSemp
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { RINGAN, aturRingan, renderer, potongSeg, partner, mulaiSuap, get SINE() { return SINE; }, HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { mulaiCredit, mulaiFilm, putarFilm, RINGAN, aturRingan, renderer, potongSeg, partner, mulaiSuap, get SINE() { return SINE; }, HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };

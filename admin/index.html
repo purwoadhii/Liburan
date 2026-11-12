@@ -180,6 +180,10 @@ function slotHtml(i) {
     <div id="s-file-${i}"><input id="video-${i}" type="file" accept="video/mp4,video/webm" style="margin-top:8px"><small>MP4 (H.264) paling aman untuk HP, maksimal sekitar 90 MB.</small></div>
     <div id="s-link-${i}" class="sembunyi"><input id="link-${i}" placeholder="https://.../film.mp4" style="margin-top:8px"></div>
     <div id="s-youtube-${i}" class="sembunyi"><input id="yt-${i}" placeholder="https://youtu.be/..." style="margin-top:8px"><small>Diputar layar penuh di atas bioskop.</small></div>
+    <label>Video credit film <small>(opsional, diputar di layar bioskop setelah film selesai)</small></label>
+    <input id="credit-${i}" type="file" accept="video/mp4,video/webm"><small>Hanya untuk film dari upload atau link .mp4 (bukan YouTube). Maksimal sekitar 90 MB.</small>
+    <div id="credit-ada-${i}" class="kecil" style="margin:6px 0"></div>
+    <label class="sembunyi" id="credit-hapus-l-${i}" style="font-weight:400"><input type="checkbox" id="credit-hapus-${i}" style="width:auto"> Hapus video credit yang tersimpan</label>
     <progress id="progres-${i}" class="sembunyi"></progress>
     <div class="baris"><button class="utama" id="simpan-${i}">Simpan film ${i + 1}</button><button class="hapus" id="hapus-${i}">Kosongkan</button></div>
   </div>`;
@@ -196,7 +200,9 @@ function tampil() {
     const s = f.youtube ? 'youtube' : (f.video && !f.video.startsWith('film/') ? 'link' : 'file');
     document.querySelector(`input[name=sumber-${i}][value=${s}]`).checked = true; gantiSumber(i);
     $('link-' + i).value = s === 'link' ? f.video : ''; $('yt-' + i).value = f.youtube || '';
-    $('poster-' + i).value = ''; $('video-' + i).value = '';
+    $('poster-' + i).value = ''; $('video-' + i).value = ''; $('credit-' + i).value = ''; $('credit-hapus-' + i).checked = false;
+    $('credit-hapus-l-' + i).classList.toggle('sembunyi', !f.credit);
+    $('credit-ada-' + i).innerHTML = f.credit ? `🎞️ Credit yang tersimpan (${esc(f.credit.split('/').pop())}):<video src="../${esc(f.credit)}" controls preload="metadata" playsinline style="width:100%;max-height:160px;margin-top:4px;border-radius:8px;background:#000"></video>` : (f.judul ? 'Belum ada video credit. Setelah film selesai layar hanya menampilkan ucapan terima kasih.' : '');
     $('pv-' + i).outerHTML = f.poster ? `<img id="pv-${i}" src="../${esc(f.poster)}?t=${Date.now()}" alt="">` : `<div class="kosong" id="pv-${i}">🎬</div>`;
     const jenis = f.youtube ? 'YouTube' : f.video ? (f.video.startsWith('film/') ? 'Video sudah diunggah' : 'Link video') : 'Judul saja, belum ada video';
     $('ket-' + i).innerHTML = !f.judul ? '<span style="display:inline-block;margin-top:4px;padding:3px 10px;border-radius:99px;background:#ece6da;color:#6b6257;font-size:13px">Belum ada film</span>'
@@ -235,6 +241,17 @@ async function simpanSlot(i) {
         if (lama.video && lama.video.startsWith('film/') && lama.video !== f.video) await hapusFile(lama.video).catch(() => {});
       } else if (lama.video && lama.video.startsWith('film/')) f.video = lama.video;
     }
+    // video credit (diputar setelah film selesai)
+    const cf = $('credit-' + i).files[0];
+    if (cf) {
+      if (cf.size > 90 * 1024 * 1024) throw new Error('Video credit lebih dari 90 MB. Kompres dulu.');
+      status('Mengunggah video credit… jangan tutup halaman ini.', 0);
+      $('progres-' + i).classList.remove('sembunyi');
+      f.credit = 'film/' + id + '-credit.' + (cf.name.split('.').pop() || 'mp4').toLowerCase();
+      await tulis(f.credit, await fileB64(cf), 'Upload credit ' + judul);
+      if (lama.credit && lama.credit !== f.credit) await hapusFile(lama.credit).catch(() => {});
+    } else if (lama.credit && !$('credit-hapus-' + i).checked) f.credit = lama.credit;
+    else if (lama.credit) await hapusFile(lama.credit).catch(() => {});
     const pf = $('poster-' + i).files[0];
     if (pf) {
       status('Mengunggah poster…', 0);
@@ -258,7 +275,7 @@ async function kosongkan(i) {
   status('Menghapus…', 0);
   try {
     data.daftar[i] = { judul: '' }; await simpanData('Kosongkan film ' + (i + 1));
-    for (const p of [f.video, f.poster]) if (p && p.startsWith('film/')) await hapusFile(p).catch(() => {});
+    for (const p of [f.video, f.poster, f.credit]) if (p && p.startsWith('film/')) await hapusFile(p).catch(() => {});
     tampil(); status('Film ' + (i + 1) + ' dikosongkan.');
   } catch (er) { status('Gagal: ' + er.message, 6000); }
 }
