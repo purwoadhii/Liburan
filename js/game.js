@@ -18,7 +18,7 @@ try {
   $('mulai').classList.add('sembunyi'); $('galat').classList.remove('sembunyi');
   throw e;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -60,7 +60,7 @@ function garisTepi(akar, minR = 0.04) {
 const GARIS = [], _gp = new THREE.Vector3();
 setInterval(() => {
   for (const G of GARIS) {
-    G.akar.getWorldPosition(_gp); const dekat = _gp.distanceToSquared(camera.position) < 26 * 26;
+    G.akar.getWorldPosition(_gp); const dekat = RINGAN.tingkat < 2 && _gp.distanceToSquared(camera.position) < 18 * 18;
     if (dekat !== G.tampak) { G.tampak = dekat; for (const o of G.isi) o.visible = dekat; }
   }
 }, 300);
@@ -73,13 +73,14 @@ function mat(c, o = {}) {
 }
 const G = {};
 const geo = (k, f) => G[k] || (G[k] = f());
-const halus = n => n < 6 ? n + 2 : Math.round(n * 1.5);
-const sph = (r, w = 10, h = 8) => geo(`s${r},${w},${h}`, () => new THREE.SphereGeometry(r, halus(w), halus(h)));
-const cyl = (a, b, h, s = 8) => geo(`c${a},${b},${h},${s}`, () => new THREE.CylinderGeometry(a, b, h, s < 6 ? s : halus(s)));
+let HEMAT = false; // orang lain (NPC) memakai bentuk yang lebih hemat
+const halus = n => (HEMAT || n < 8) ? n : Math.round(n * 1.3);
+const sph = (r, w = 10, h = 8) => { w = halus(w); h = halus(h); return geo(`s${r},${w},${h}`, () => new THREE.SphereGeometry(r, w, h)); };
+const cyl = (a, b, h, s = 8) => { s = halus(s); return geo(`c${a},${b},${h},${s}`, () => new THREE.CylinderGeometry(a, b, h, s)); };
 const box = (w, h, d) => geo(`b${w},${h},${d}`, () => new THREE.BoxGeometry(w, h, d));
 const cone = (r, h, s = 8) => geo(`k${r},${h},${s}`, () => new THREE.ConeGeometry(r, h, s < 6 ? s : halus(s)));
-const limbDown = (a, b, L, s = 7) => geo(`ld${a},${b},${L},${s}`, () => { const g = new THREE.CylinderGeometry(a, b, L, halus(s)); g.translate(0, -L / 2, 0); return g; });
-const limbUp = (a, b, L, s = 7) => geo(`lu${a},${b},${L},${s}`, () => { const g = new THREE.CylinderGeometry(a, b, L, halus(s)); g.translate(0, L / 2, 0); return g; });
+const limbDown = (a, b, L, s = 8) => geo(`ld${a},${b},${L},${s = HEMAT ? 6 : halus(s)}`, () => { const g = new THREE.CylinderGeometry(a, b, L, s); g.translate(0, -L / 2, 0); return g; });
+const limbUp = (a, b, L, s = 8) => geo(`lu${a},${b},${L},${s = halus(s)}`, () => { const g = new THREE.CylinderGeometry(a, b, L, s); g.translate(0, L / 2, 0); return g; });
 
 function mesh(g, m, x = 0, y = 0, z = 0, parent, shadow = true) {
   const me = new THREE.Mesh(g, (typeof m === 'string') ? mat(m) : m);
@@ -501,7 +502,7 @@ for (let i = 0; i < 420; i++) {
   // bulat
   const trunk = new THREE.InstancedMesh(cyl(0.22, 0.32, 3, 6), mat('#7a5634'), treeData.length);
   let ti = 0;
-  const leaf = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.2, 1), new Toon({}), kinds[0].length * 2);
+  const leaf = new THREE.InstancedMesh((() => { const g = new THREE.IcosahedronGeometry(2.2, 0), ps = g.attributes.position, nr = g.attributes.normal, v = new THREE.Vector3(); for (let i = 0; i < ps.count; i++) { v.fromBufferAttribute(ps, i).normalize(); nr.setXYZ(i, v.x, v.y, v.z); } return g; })(), new Toon({}), kinds[0].length * 2);
   let li = 0; const col = new THREE.Color();
   for (const t of kinds[0]) {
     m4.compose(v.set(t.x, 1.5 * t.s, t.z), q.identity(), s.set(t.s, t.s, t.s)); trunk.setMatrixAt(ti++, m4);
@@ -644,6 +645,9 @@ function makeArm(parent, x, y, len, sleeveCol, skin, r) {
   return { pivot, inner, hand, len };
 }
 function makePerson(cewek, o = {}) {
+  HEMAT = !!o.npc; try { return makePerson_(cewek, o); } finally { HEMAT = false; }
+}
+function makePerson_(cewek, o) {
   const g = new THREE.Group();
   const skin = o.kulit || (cewek ? '#f1c7a5' : '#d9a57d');
   const P = { group: g, legs: [], arms: [], headParts: [], cewek, hip: cewek ? 0.8 : 0.9 };
@@ -4069,8 +4073,18 @@ ui.aksi.onclick = () => { if (nearest) openInter(nearest); };
 
 const clock = new THREE.Clock();
 let tt = 0;
+// kualitas menyesuaikan kemampuan perangkat: kalau gambar tersendat, resolusi, garis tepi, lalu bayangan dikurangi otomatis
+var RINGAN = { tingkat: 0, t: 0, n: 0, tunggu: 5 };
+function aturRingan(k) {
+  RINGAN.tingkat = k; try { localStorage.setItem('safari_ringan', k); } catch (e) { }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, [1.5, 1.25, 1, 1][k]));
+  sun.castShadow = k < 3;
+}
+try { const k = +localStorage.getItem('safari_ringan') || 0; if (k > 0 && k <= 3) aturRingan(k); } catch (e) { }
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.05); tt += dt;
+  if (RINGAN.tunggu > 0) RINGAN.tunggu -= dt;
+  else if (!paused) { RINGAN.t += dt; RINGAN.n++; if (RINGAN.t >= 2.5) { const fps = RINGAN.n / RINGAN.t; RINGAN.t = RINGAN.n = 0; if (fps < 32 && RINGAN.tingkat < 3) { aturRingan(RINGAN.tingkat + 1); RINGAN.tunggu = 2; } } }
   update(dt, tt);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -5363,4 +5377,4 @@ function updateKejutan(dt, t) { if (!kejSiap) return; updateSine(dt); updateSemp
 grid.clear(); buildGrid();
 kejSiap = true;
 
-window.__safari = { renderer, potongSeg, partner, mulaiSuap, get SINE() { return SINE; }, HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
+window.__safari = { RINGAN, aturRingan, renderer, potongSeg, partner, mulaiSuap, get SINE() { return SINE; }, HALTE, JIP, GEROBAK, TIKET_TB, bukaTiketTB, circles, segs, KIOS, ANTRIAN, FC_PINTU, mulaiPutarFilm, kursiKosong, potongKue, tiupLilin, KUE_: () => KUE, camera, gedungDalam, get distCam() { return distCam; }, BALASAN, tulisBalasan, mulaiTitip, bukaSurat, bukaInfo, PAPAN_INFO, INFO_TAB, LAMAR, KEMBANG, LOVE, CINCIN, ORANG_AT, mulaiLamaran, tengahMalam, mulaiKembangApi, BANGKU_AT, dudukBangku, get AUTO() { return AUTO; }, pilihKursi, bukaFilmUI: () => bukaFilm(), BIOS, WAHANA, tawarWahana, get NAIK_W() { return NAIK_W; }, animals, mulaiFilm, berdiri, KEJ, kejutanSetelahMakan, mulaiKejutan, KUNANG, KUE, kirimKue, tanyaTiup, bukaKamera, SURAT, GAJAH_SURAT, USIR, get SATPAM() { return SATPAM; }, atBuka, JIP, HALTE, LIHAT, naikJip, turunJip, get NAIK() { return NAIK; }, statusJip, LOKET_MASUK, bukaTiketMasuk, STOK, BAWA, TIKET, aturBawa, bukaBooth, bukaFilm, DOMPET, pesanan: () => pesanan, NUMPANG, BALIK, MEJA, duduk: (i) => dudukMeja(MEJA[i]), AMATI, amati: mulaiAmati, info: () => ({ calls: renderer.info.render.calls, tri: renderer.info.render.triangles }), player, npcs, BIOS, ANTRIAN, WAKTU, TOPI, inter: () => interactables, open: (k) => { const it = interactables.find(i => i.kind === k); if (it) openInter(it); }, setMode: (m) => { mode = m; setModeLabel(); }, get modeT() { return modeT; }, cam: (y, p) => { camYaw = y; camPitch = p; }, tp: (x, z, yaw) => { player.x = x; player.z = z; if (yaw != null) { player.yaw = yaw; camYaw = yaw; } partner.x = x + 0.7; partner.z = z; } };
